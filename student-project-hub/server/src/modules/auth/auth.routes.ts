@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.js';
-import { authLimiter } from '../../middleware/rate-limit.js';
+import { accountLimiter, authLimiter } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import * as controller from './auth.controller.js';
 import {
@@ -14,7 +14,13 @@ import {
 export const authRouter = Router();
 
 authRouter.post('/register', authLimiter, validate({ body: registerSchema }), controller.register);
-authRouter.post('/login', authLimiter, validate({ body: loginSchema }), controller.login);
+authRouter.post(
+  '/login',
+  authLimiter,
+  validate({ body: loginSchema }),
+  accountLimiter,
+  controller.login,
+);
 authRouter.post('/refresh', controller.refresh);
 authRouter.post('/logout', controller.logout);
 authRouter.get('/me', requireAuth, controller.me);
@@ -24,6 +30,7 @@ authRouter.post(
   '/forgot-password',
   authLimiter,
   validate({ body: forgotPasswordSchema }),
+  accountLimiter,
   controller.forgotPassword,
 );
 authRouter.post(

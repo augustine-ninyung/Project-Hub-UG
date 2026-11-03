@@ -11,6 +11,10 @@ const envSchema = z.object({
     .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean)),
   CLIENT_URL: z.string().url().default('http://localhost:5173'),
   API_URL: z.string().url().default('http://localhost:4000'),
+  /** Proxies in front of the API: 1 = Render only, 2 = Vercel rewrite + Render. */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
+  /** 'lax' when the client reaches the API on the same site (Vercel rewrite); 'none' if cross-site. */
+  COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
@@ -47,9 +51,18 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
-if (env.NODE_ENV === 'production' && !(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY)) {
-  console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in production.');
-  process.exit(1);
+if (env.NODE_ENV === 'production') {
+  const missing = [
+    !env.SUPABASE_URL && 'SUPABASE_URL',
+    !env.SUPABASE_SERVICE_ROLE_KEY && 'SUPABASE_SERVICE_ROLE_KEY',
+    // Without SMTP, verification and reset emails would only reach the logs.
+    !env.SMTP_HOST && 'SMTP_HOST',
+    !process.env.EMAIL_FROM && 'EMAIL_FROM',
+  ].filter(Boolean);
+  if (missing.length) {
+    console.error(`Missing required production configuration: ${missing.join(', ')}`);
+    process.exit(1);
+  }
 }
 
 export const isProduction = env.NODE_ENV === 'production';

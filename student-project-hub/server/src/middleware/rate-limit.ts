@@ -17,5 +17,17 @@ export const apiLimiter = rateLimit({ ...common, windowMs: 15 * 60 * 1000, limit
 /** Login / register / password flows: brute-force protection. */
 export const authLimiter = rateLimit({ ...common, windowMs: 15 * 60 * 1000, limit: 20 });
 
+/**
+ * Per-account limit for login and password-reset requests, keyed on the
+ * validated email/username so it holds even when client IPs are hidden or
+ * rotated. Must run after body validation.
+ */
+export const accountLimiter = rateLimit({
+  ...common,
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  keyGenerator: (req) => `account:${String(req.body?.identifier ?? req.body?.email ?? req.ip)}`,
+});
+
 /** Writes that trigger notifications or emails (comments, likes, reports, invites). */
 export const writeLimiter = rateLimit({ ...common, windowMs: 60 * 1000, limit: 60 });

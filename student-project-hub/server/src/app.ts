@@ -13,8 +13,8 @@ import { LOCAL_UPLOAD_DIR } from './services/storage.service.js';
 export function createApp() {
   const app = express();
 
-  // Render/Vercel sit behind one proxy; needed for correct req.ip and rate limiting.
-  app.set('trust proxy', 1);
+  // Number of proxies in front of the API; needed for correct req.ip and rate limiting.
+  app.set('trust proxy', env.TRUST_PROXY);
   app.disable('x-powered-by');
 
   app.use(

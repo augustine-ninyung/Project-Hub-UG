@@ -71,7 +71,6 @@ All seeded students use `Password123`. Their usernames are `kwame_dev`, `ama_cod
 ```
 student-project-hub/
 ├── package.json              # npm workspaces + root scripts
-├── render.yaml               # Render blueprint for the API
 ├── server/
 │   ├── prisma/
 │   │   ├── schema.prisma     # data model
@@ -91,7 +90,7 @@ student-project-hub/
 │   │       └── reports/  admin/  meta/
 │   └── tests/                # API tests (auth, projects, engagement, admin)
 └── client/
-    ├── vercel.json           # SPA rewrites
+    ├── vercel.json           # /api proxy to Render + SPA rewrites
     └── src/
         ├── components/       # ui/ (design-system primitives), common/, layout/
         ├── features/         # auth, projects, comments, notifications, users, admin
@@ -126,22 +125,24 @@ student-project-hub/
 | `CORS_ORIGINS` | ✅ in prod | `http://localhost:5173` | Comma-separated client origins allowed to call the API |
 | `CLIENT_URL` | ✅ in prod | `http://localhost:5173` | Used to build links in emails |
 | `API_URL` | | `http://localhost:4000` | Used to build URLs for locally stored uploads |
+| `TRUST_PROXY` | | `1` | Proxies in front of the API: `2` behind the Vercel rewrite plus Render |
+| `COOKIE_SAME_SITE` | | `lax` | `lax` when the client reaches the API on the same site; `none` only for a cross-site setup |
 | `SUPABASE_URL` | ✅ in prod | | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ in prod | | Service-role key (server-side only, never sent to the client) |
 | `SUPABASE_BUCKET` | | `project-hub` | Name of a **public** storage bucket |
 | `LOCAL_UPLOAD_DIR` | | `uploads` | Local-disk fallback directory when Supabase is not configured |
-| `SMTP_HOST` | recommended in prod | | SMTP server. If empty, emails are logged to the console |
+| `SMTP_HOST` | ✅ in prod | | SMTP server. In development, if empty, emails are logged to the console |
 | `SMTP_PORT` / `SMTP_SECURE` | | `587` / `false` | SMTP connection settings |
 | `SMTP_USER` / `SMTP_PASS` | | | SMTP credentials |
-| `EMAIL_FROM` | | `Student Project Hub <no-reply@example.com>` | Sender address |
+| `EMAIL_FROM` | ✅ in prod | `Student Project Hub <no-reply@example.com>` | Sender address (must be a domain your SMTP provider lets you send from) |
 
-The server validates its environment at startup and exits with a clear message if anything is missing or malformed. In production it refuses to start without Supabase credentials.
+The server validates its environment at startup and exits with a clear message if anything is missing or malformed. In production it refuses to start without Supabase credentials, `SMTP_HOST` and `EMAIL_FROM`.
 
 ### Client (`client/.env`)
 
 | Variable | Description |
 |---|---|
-| `VITE_API_URL` | API base URL including `/api/v1`, e.g. `https://your-api.onrender.com/api/v1` |
+| `VITE_API_URL` | API base URL including `/api/v1`. Locally `http://localhost:4000/api/v1`; on Vercel `/api/v1` (see Deployment) |
 
 ### External credentials you need to provide
 
@@ -235,14 +236,14 @@ Base path: `/api/v1`. 🔒 means a session is required, ✉️ means a verified 
 ## Security model
 
 - **Passwords** are hashed with Argon2id. Login errors are identical for an unknown user and a wrong password, and a dummy hash keeps response timing uniform.
-- **Sessions:** a 15-minute JWT access token and a 30-day opaque refresh token, both in `httpOnly` cookies (`Secure; SameSite=None` in production, because the client and API are on different sites). Refresh tokens rotate on every use and only their hashes are stored. If a rotated token is replayed, every session for that user is revoked. A password reset or an account suspension also revokes all sessions.
+- **Sessions:** a 15-minute JWT access token and a 30-day opaque refresh token, both in `httpOnly` cookies (`Secure; SameSite=Lax` in production). In production the browser only talks to the Vercel origin, which forwards `/api` to Render, so the cookies are first-party and keep working in browsers that block third-party cookies. Refresh tokens rotate on every use and only their hashes are stored. If a rotated token is replayed, every session for that user is revoked. A password reset or an account suspension also revokes all sessions.
 - **CSRF:** every state-changing request must carry `X-Requested-With: XMLHttpRequest`. Browsers only send a custom header cross-origin after a CORS preflight, and the CORS allowlist rejects untrusted origins.
 - **Authorization** is enforced on the server for every request: owner-or-admin checks for project changes, author checks for comment edits, and `requireRole('ADMIN')` on the whole admin router. The client's route guards only improve the user experience.
 - **Private projects** are filtered in every query through one helper (`visibleProjectsWhere`). An unauthorized viewer gets a 404, so the project's existence isn't revealed.
 - **Validation:** Zod validates every body, query and params object. Prisma parameterises all queries, which prevents SQL injection.
 - **XSS:** user content is stored as plain text and rendered as text by React. URLs must use `http(s)` (no `javascript:` links). Helmet sets secure headers.
 - **Uploads:** files are buffered in memory with a 5 MB limit and at most 9 per request, and only image MIME types are accepted. Every file is then decoded and re-encoded as WebP with sharp. This rejects files that aren't real images, strips EXIF and embedded payloads, and resizes for performance.
-- **Rate limiting:** a global per-IP limit, a stricter limit on auth endpoints, and a write limit on likes, comments, reports and invites.
+- **Rate limiting:** a global per-IP limit, a stricter per-IP limit on auth endpoints, a per-account limit on login and password-reset requests (so brute force is capped even if IPs rotate), and a write limit on likes, comments, reports and invites. Limits are kept in memory, so they apply per server instance.
 - **Secrets** come only from environment variables. `.env` files are git-ignored.
 
 ---
@@ -255,23 +256,28 @@ Create a PostgreSQL database (Neon, Supabase, Render Postgres, …) and copy its
 
 ### 2. API on Render
 
-1. Push the repository to GitHub.
-2. In Render, choose **New → Blueprint**, select the repo, and Render reads [`render.yaml`](render.yaml). Alternatively create a **Web Service** manually with these settings:
+1. Push the repository to GitHub. The project lives in the `student-project-hub/` folder of the repo, and the Blueprint file is `render.yaml` at the **repo root** (one level above this README).
+2. In Render, choose **New → Blueprint** and select the repo; Render reads `render.yaml`, which sets `rootDir: student-project-hub`. Alternatively create a **Web Service** manually with these settings:
+   - Root directory: `student-project-hub`
    - Build command: `npm ci && npm run build -w server`
    - Pre-deploy command: `npm run db:deploy -w server`
    - Start command: `npm start -w server`
    - Health check path: `/health`
-3. Set the environment variables: `DATABASE_URL`, `JWT_ACCESS_SECRET` (the blueprint generates one), `CORS_ORIGINS` and `CLIENT_URL` (your Vercel URL), `API_URL` (the Render URL), the Supabase variables, and SMTP.
-4. After the first deploy, create an admin. Either register normally and promote that account with SQL (`UPDATE "User" SET role = 'ADMIN' WHERE email = '…';`), or, for a demo environment only, run the seed once with `SEED_FORCE=true`. **The seed deletes all data.**
+3. Set the environment variables: `DATABASE_URL`, `JWT_ACCESS_SECRET` (the blueprint generates one), `CORS_ORIGINS` and `CLIENT_URL` (your Vercel URL), `API_URL` (the Render URL), the Supabase variables, `SMTP_*` and `EMAIL_FROM`. The blueprint sets `TRUST_PROXY=2` and `COOKIE_SAME_SITE=lax`.
+4. Note the service URL Render gives you (normally `https://student-project-hub-api.onrender.com`; Render adds a suffix if the name is taken).
+5. After the first deploy, create an admin. Either register normally and promote that account with SQL (`UPDATE "User" SET role = 'ADMIN' WHERE email = '…';`), or, for a demo environment only, run the seed once with `SEED_FORCE=true`. **The seed deletes all data.**
 
 ### 3. Client on Vercel
 
-1. Import the repository in Vercel and set **Root Directory** to `client`.
+1. Import the repository in Vercel and set **Root Directory** to `student-project-hub/client`.
 2. The framework preset is Vite. The build command is `npm run build` and the output directory is `dist`.
-3. Set `VITE_API_URL=https://<your-render-service>.onrender.com/api/v1`.
-4. Deploy. [`client/vercel.json`](client/vercel.json) rewrites all routes to `index.html` so deep links work.
+3. Set `VITE_API_URL=/api/v1`.
+4. In [`client/vercel.json`](client/vercel.json), make sure the `/api/:path*` rewrite's destination is your Render service URL from step 2.4. Vercel forwards every `/api` request there, so the browser only ever talks to the Vercel origin and auth cookies stay first-party. The second rule rewrites all other routes to `index.html` so deep links work.
+5. Deploy.
 
 Make sure the API's `CORS_ORIGINS` includes the exact Vercel origin (scheme and host, no trailing slash). Add your custom domain too if you use one.
+
+**Check after the first deploy:** sign in on Safari or in a private window (both block third-party cookies) and confirm you stay signed in after a reload. In the Render logs, the request lines should show visitors' real IP addresses, not a small set of Vercel addresses; if they don't, adjust `TRUST_PROXY`.
 
 ---
 
@@ -282,6 +288,8 @@ Make sure the API's `CORS_ORIGINS` includes the exact Vercel origin (scheme and 
 | `Invalid environment configuration` on start | Check the variable named in the message in `server/.env` |
 | `Can't reach database server` | Start `npm run db:local`, or fix `DATABASE_URL` |
 | `pre-existing shared memory block is still in use` | An old embedded Postgres is still running. Stop the `postgres.exe` processes for that data directory (Task Manager) and retry |
-| Signed in, but requests return 401 in production | `CORS_ORIGINS` must match the client origin exactly, and the API must be served over HTTPS (cookies are `Secure`) |
-| "Verify your email" banner and no email arrived | Without SMTP, the link is printed in the API logs. Otherwise use **Resend email** in the banner |
+| Signed in, but requests return 401 in production | Set `VITE_API_URL=/api/v1` on Vercel and point the `/api` rewrite in `client/vercel.json` at your Render URL. Calling the Render URL directly makes the cookies third-party, and many browsers block them |
+| Server exits with `Missing required production configuration` | Set the variables it names (Supabase, `SMTP_HOST`, `EMAIL_FROM`) in Render |
+| "Verify your email" banner and no email arrived | In development the link is printed in the API logs. In production, check the SMTP settings and the API logs for `Failed to send email`, then use **Resend email** in the banner |
+| Everyone gets "Too many requests" at once | `TRUST_PROXY` is too low, so all visitors share one proxy IP. Use `2` behind the Vercel rewrite |
 | Slow installs or file-lock errors (`EPERM`) | The repo is in a OneDrive-synced folder. Move it somewhere not synced, or pause syncing while installing |
