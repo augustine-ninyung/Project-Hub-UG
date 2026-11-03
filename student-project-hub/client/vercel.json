@@ -1,9 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://student-project-hub-api.onrender.com/api/:path*"
-    },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

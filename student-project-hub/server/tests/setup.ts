@@ -3,6 +3,7 @@ import { prisma } from '../src/config/prisma.js';
 
 const TABLES = [
   'Report',
+  'RateLimit',
   'Notification',
   'Comment',
   'Like',

@@ -113,7 +113,7 @@ export default function SettingsPage() {
           <UserAvatar user={user} size="lg" className="size-20 text-2xl" />
           <div className="flex-1">
             <h2 className="font-semibold">Profile picture</h2>
-            <p className="text-sm text-muted-foreground">JPEG, PNG, WebP or GIF, up to 5 MB.</p>
+            <p className="text-sm text-muted-foreground">JPEG, PNG, WebP or GIF, up to 20 MB.</p>
           </div>
           <div className="flex gap-2">
             <input

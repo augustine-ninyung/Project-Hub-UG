@@ -10,6 +10,7 @@ import type {
   Technology,
   Visibility,
 } from '@/types/api';
+import { prepareUploads } from '@/utils/compress-image';
 import { request, requestPage } from './api';
 
 export type ProjectSort = 'newest' | 'most_liked' | 'most_commented';
@@ -44,11 +45,13 @@ export interface ProjectUpload {
   onProgress?: (percent: number) => void;
 }
 
-function toFormData({ data, cover, screenshots }: ProjectUpload) {
+/** Compresses images (one request must stay under Vercel's body limit) and builds the multipart body. */
+async function toFormData({ data, cover, screenshots }: ProjectUpload) {
+  const files = await prepareUploads(cover ? [cover, ...screenshots] : screenshots);
   const form = new FormData();
   form.append('data', JSON.stringify(data));
-  if (cover) form.append('cover', cover);
-  for (const file of screenshots) form.append('screenshots', file);
+  if (cover) form.append('cover', files.shift()!);
+  for (const file of files) form.append('screenshots', file);
   return form;
 }
 
@@ -70,19 +73,19 @@ export const projectService = {
   related: (id: string, limit = 4) =>
     request<ProjectCard[]>({ url: `/projects/${id}/related`, params: { limit } }),
 
-  create: (upload: ProjectUpload) =>
+  create: async (upload: ProjectUpload) =>
     request<ProjectDetail>({
       method: 'POST',
       url: '/projects',
-      data: toFormData(upload),
+      data: await toFormData(upload),
       onUploadProgress: progressHandler(upload.onProgress),
       timeout: 120_000,
     }),
-  update: (id: string, upload: ProjectUpload) =>
+  update: async (id: string, upload: ProjectUpload) =>
     request<ProjectDetail>({
       method: 'PATCH',
       url: `/projects/${id}`,
-      data: toFormData(upload),
+      data: await toFormData(upload),
       onUploadProgress: progressHandler(upload.onProgress),
       timeout: 120_000,
     }),

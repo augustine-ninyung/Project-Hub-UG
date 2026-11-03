@@ -73,9 +73,9 @@ describe('ProjectForm', () => {
 
   it('rejects oversized and non-image files before upload', async () => {
     renderForm();
-    const huge = new File([new Uint8Array(6 * 1024 * 1024)], 'huge.png', { type: 'image/png' });
+    const huge = new File([new Uint8Array(21 * 1024 * 1024)], 'huge.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText(/Upload a cover image/), { target: { files: [huge] } });
-    expect(await screen.findByText(/images must be 5 MB or smaller/)).toBeInTheDocument();
+    expect(await screen.findByText(/images must be 20 MB or smaller/)).toBeInTheDocument();
 
     const pdf = new File(['%PDF'], 'doc.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByLabelText(/Upload a cover image/), { target: { files: [pdf] } });

@@ -11,9 +11,9 @@ const envSchema = z.object({
     .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean)),
   CLIENT_URL: z.string().url().default('http://localhost:5173'),
   API_URL: z.string().url().default('http://localhost:4000'),
-  /** Proxies in front of the API: 1 = Render only, 2 = Vercel rewrite + Render. */
+  /** Proxies in front of the API (Vercel's edge network counts as one). */
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
-  /** 'lax' when the client reaches the API on the same site (Vercel rewrite); 'none' if cross-site. */
+  /** 'lax' when the client and API share a site (the Vercel setup); 'none' if cross-site. */
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -39,7 +39,19 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().default('Student Project Hub <no-reply@example.com>'),
 });
 
-const parsed = envSchema.safeParse(process.env);
+// On Vercel the client and API share one origin, so the production URL that
+// Vercel provides is a sensible default for the URL settings.
+const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : undefined;
+const source: Record<string, string | undefined> = { ...process.env };
+if (vercelUrl) {
+  for (const key of ['CLIENT_URL', 'CORS_ORIGINS', 'API_URL']) {
+    if (!source[key]) source[key] = vercelUrl;
+  }
+}
+
+const parsed = envSchema.safeParse(source);
 
 if (!parsed.success) {
   console.error('Invalid environment configuration:');

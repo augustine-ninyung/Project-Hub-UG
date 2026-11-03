@@ -71,6 +71,9 @@ All seeded students use `Password123`. Their usernames are `kwame_dev`, `ama_cod
 ```
 student-project-hub/
 ├── package.json              # npm workspaces + root scripts
+├── vercel.json               # Vercel build settings and routing
+├── api/index.js              # Vercel Function that runs the Express API
+├── scripts/vercel-build.js   # Vercel build: migrations (production) + builds
 ├── server/
 │   ├── prisma/
 │   │   ├── schema.prisma     # data model
@@ -90,7 +93,6 @@ student-project-hub/
 │   │       └── reports/  admin/  meta/
 │   └── tests/                # API tests (auth, projects, engagement, admin)
 └── client/
-    ├── vercel.json           # /api proxy to Render + SPA rewrites
     └── src/
         ├── components/       # ui/ (design-system primitives), common/, layout/
         ├── features/         # auth, projects, comments, notifications, users, admin
@@ -122,11 +124,12 @@ student-project-hub/
 | `JWT_ACCESS_SECRET` | ✅ | | ≥ 32 random characters, used to sign access tokens |
 | `ACCESS_TOKEN_TTL_MINUTES` | | `15` | Access-token lifetime |
 | `REFRESH_TOKEN_TTL_DAYS` | | `30` | Session (refresh-token) lifetime |
-| `CORS_ORIGINS` | ✅ in prod | `http://localhost:5173` | Comma-separated client origins allowed to call the API |
-| `CLIENT_URL` | ✅ in prod | `http://localhost:5173` | Used to build links in emails |
+| `DIRECT_URL` | ✅ on Vercel | | Session-pooler connection string, used only to run migrations during production builds |
+| `CORS_ORIGINS` | | `http://localhost:5173` | Comma-separated client origins allowed to call the API. On Vercel defaults to the production URL |
+| `CLIENT_URL` | | `http://localhost:5173` | Used to build links in emails. On Vercel defaults to the production URL; set it if you add a custom domain |
 | `API_URL` | | `http://localhost:4000` | Used to build URLs for locally stored uploads |
-| `TRUST_PROXY` | | `1` | Proxies in front of the API: `2` behind the Vercel rewrite plus Render |
-| `COOKIE_SAME_SITE` | | `lax` | `lax` when the client reaches the API on the same site; `none` only for a cross-site setup |
+| `TRUST_PROXY` | | `1` | Proxies in front of the API (Vercel counts as one) |
+| `COOKIE_SAME_SITE` | | `lax` | `lax` when the client and API share a site (local dev and Vercel); `none` only for a cross-site setup |
 | `SUPABASE_URL` | ✅ in prod | | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ in prod | | Service-role key (server-side only, never sent to the client) |
 | `SUPABASE_BUCKET` | | `project-hub` | Name of a **public** storage bucket |
@@ -142,15 +145,14 @@ The server validates its environment at startup and exits with a clear message i
 
 | Variable | Description |
 |---|---|
-| `VITE_API_URL` | API base URL including `/api/v1`. Locally `http://localhost:4000/api/v1`; on Vercel `/api/v1` (see Deployment) |
+| `VITE_API_URL` | API base URL including `/api/v1`. Locally `http://localhost:4000/api/v1`. Production builds default to `/api/v1` (same origin), so it isn't needed on Vercel |
 
 ### External credentials you need to provide
 
 None are committed, and none are needed for local development:
 
-- **Supabase:** create a project, then go to *Storage* and create a **public** bucket (default name `project-hub`). Copy the project URL and the `service_role` key from *Project Settings → API*.
-- **SMTP:** any provider works (Resend, Brevo, Mailgun, SendGrid, or Gmail with an app password).
-- **PostgreSQL:** any Prisma-compatible host (Neon, Supabase Postgres, Render Postgres, Railway).
+- **Supabase:** create a project. Under *Storage*, create a **public** bucket (default name `project-hub`). Copy the project URL and the `service_role` key from *Project Settings → API*, and the database connection strings from the **Connect** button (see Deployment).
+- **SMTP:** Supabase doesn't send email for your app, so you need a provider such as Resend, Brevo, Mailgun, SendGrid, or Gmail with an app password.
 
 ---
 
@@ -236,48 +238,63 @@ Base path: `/api/v1`. 🔒 means a session is required, ✉️ means a verified 
 ## Security model
 
 - **Passwords** are hashed with Argon2id. Login errors are identical for an unknown user and a wrong password, and a dummy hash keeps response timing uniform.
-- **Sessions:** a 15-minute JWT access token and a 30-day opaque refresh token, both in `httpOnly` cookies (`Secure; SameSite=Lax` in production). In production the browser only talks to the Vercel origin, which forwards `/api` to Render, so the cookies are first-party and keep working in browsers that block third-party cookies. Refresh tokens rotate on every use and only their hashes are stored. If a rotated token is replayed, every session for that user is revoked. A password reset or an account suspension also revokes all sessions.
+- **Sessions:** a 15-minute JWT access token and a 30-day opaque refresh token, both in `httpOnly` cookies (`Secure; SameSite=Lax` in production). In production the website and the API are served from the same Vercel origin, so the cookies are first-party and keep working in browsers that block third-party cookies. Refresh tokens rotate on every use and only their hashes are stored. If a rotated token is replayed, every session for that user is revoked. A password reset or an account suspension also revokes all sessions.
 - **CSRF:** every state-changing request must carry `X-Requested-With: XMLHttpRequest`. Browsers only send a custom header cross-origin after a CORS preflight, and the CORS allowlist rejects untrusted origins.
 - **Authorization** is enforced on the server for every request: owner-or-admin checks for project changes, author checks for comment edits, and `requireRole('ADMIN')` on the whole admin router. The client's route guards only improve the user experience.
 - **Private projects** are filtered in every query through one helper (`visibleProjectsWhere`). An unauthorized viewer gets a 404, so the project's existence isn't revealed.
 - **Validation:** Zod validates every body, query and params object. Prisma parameterises all queries, which prevents SQL injection.
 - **XSS:** user content is stored as plain text and rendered as text by React. URLs must use `http(s)` (no `javascript:` links). Helmet sets secure headers.
-- **Uploads:** files are buffered in memory with a 5 MB limit and at most 9 per request, and only image MIME types are accepted. Every file is then decoded and re-encoded as WebP with sharp. This rejects files that aren't real images, strips EXIF and embedded payloads, and resizes for performance.
-- **Rate limiting:** a global per-IP limit, a stricter per-IP limit on auth endpoints, a per-account limit on login and password-reset requests (so brute force is capped even if IPs rotate), and a write limit on likes, comments, reports and invites. Limits are kept in memory, so they apply per server instance.
+- **Uploads:** the browser first downscales images to at most 1920 px and re-encodes them, so a request stays under Vercel's 4.5 MB body limit (originals up to 20 MB can be picked). On the server, files are buffered in memory with a 5 MB limit and at most 9 per request, and only image MIME types are accepted. Every file is then decoded and re-encoded as WebP with sharp. This rejects files that aren't real images, strips EXIF and embedded payloads, and resizes for performance.
+- **Rate limiting:** a stricter per-IP limit on auth endpoints and a per-account limit on login and password-reset requests (so brute force is capped even if IPs rotate). Both are counted in PostgreSQL (`RateLimit` table) because serverless instances don't share memory. A general per-IP limit and a write limit on likes, comments, reports and invites are kept in memory per instance, as lighter abuse damping.
 - **Secrets** come only from environment variables. `.env` files are git-ignored.
 
 ---
 
 ## Deployment
 
-### 1. Database
+The whole app runs as **one Vercel project**: Vercel serves the built website and runs the Express API as a serverless function ([`api/index.js`](api/index.js)) on the same domain. **Supabase** provides the PostgreSQL database and image storage. [`vercel.json`](vercel.json) holds the build settings and routes `/api/*` and `/health` to the function and everything else to the website.
 
-Create a PostgreSQL database (Neon, Supabase, Render Postgres, …) and copy its connection string. If the host gives you a pooled URL, use a direct (non-pooled) URL for migrations.
+### 1. Supabase
 
-### 2. API on Render
+1. Create a Supabase project and note the database password you choose.
+2. **Storage:** create a **public** bucket named `project-hub`.
+3. **API keys:** from *Project Settings → API*, copy the **Project URL** and the **`service_role`** key. The service-role key is secret: it goes only into Vercel's environment variables.
+4. **Database connection strings:** click **Connect** at the top of the dashboard and copy two strings, replacing `[YOUR-PASSWORD]` in each:
+   - **Transaction pooler** (port `6543`), for `DATABASE_URL`. Add `?pgbouncer=true&connection_limit=1` to the end.
+   - **Session pooler** (port `5432`), for `DIRECT_URL`. It's used only to run migrations during the build.
 
-1. Push the repository to GitHub. The project lives in the `student-project-hub/` folder of the repo, and the Blueprint file is `render.yaml` at the **repo root** (one level above this README).
-2. In Render, choose **New → Blueprint** and select the repo; Render reads `render.yaml`, which sets `rootDir: student-project-hub`. Alternatively create a **Web Service** manually with these settings:
-   - Root directory: `student-project-hub`
-   - Build command: `npm ci && npm run build -w server`
-   - Pre-deploy command: `npm run db:deploy -w server`
-   - Start command: `npm start -w server`
-   - Health check path: `/health`
-3. Set the environment variables: `DATABASE_URL`, `JWT_ACCESS_SECRET` (the blueprint generates one), `CORS_ORIGINS` and `CLIENT_URL` (your Vercel URL), `API_URL` (the Render URL), the Supabase variables, `SMTP_*` and `EMAIL_FROM`. The blueprint sets `TRUST_PROXY=2` and `COOKIE_SAME_SITE=lax`.
-4. Note the service URL Render gives you (normally `https://student-project-hub-api.onrender.com`; Render adds a suffix if the name is taken).
-5. After the first deploy, create an admin. Either register normally and promote that account with SQL (`UPDATE "User" SET role = 'ADMIN' WHERE email = '…';`), or, for a demo environment only, run the seed once with `SEED_FORCE=true`. **The seed deletes all data.**
+### 2. Email
 
-### 3. Client on Vercel
+Supabase doesn't send email for your app. Create an SMTP account (Resend, Brevo, Mailgun, …) and verify a sender domain or address with it.
 
-1. Import the repository in Vercel and set **Root Directory** to `student-project-hub/client`.
-2. The framework preset is Vite. The build command is `npm run build` and the output directory is `dist`.
-3. Set `VITE_API_URL=/api/v1`.
-4. In [`client/vercel.json`](client/vercel.json), make sure the `/api/:path*` rewrite's destination is your Render service URL from step 2.4. Vercel forwards every `/api` request there, so the browser only ever talks to the Vercel origin and auth cookies stay first-party. The second rule rewrites all other routes to `index.html` so deep links work.
-5. Deploy.
+### 3. Vercel
 
-Make sure the API's `CORS_ORIGINS` includes the exact Vercel origin (scheme and host, no trailing slash). Add your custom domain too if you use one.
+1. Import the GitHub repository in Vercel.
+2. Set **Root Directory** to `student-project-hub`. Leave the framework preset as **Other**; `vercel.json` provides the install, build and output settings.
+3. Add these **Environment Variables** (for Production, and Preview if you use preview deployments):
 
-**Check after the first deploy:** sign in on Safari or in a private window (both block third-party cookies) and confirm you stay signed in after a reload. In the Render logs, the request lines should show visitors' real IP addresses, not a small set of Vercel addresses; if they don't, adjust `TRUST_PROXY`.
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | Supabase transaction pooler string + `?pgbouncer=true&connection_limit=1` |
+   | `DIRECT_URL` | Supabase session pooler string |
+   | `JWT_ACCESS_SECRET` | 48+ random characters: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
+   | `SUPABASE_URL` | Project URL |
+   | `SUPABASE_SERVICE_ROLE_KEY` | `service_role` key |
+   | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | From your email provider |
+   | `EMAIL_FROM` | e.g. `ProjectHub <no-reply@yourdomain.com>` (a sender your provider has verified) |
+
+   Don't set `NODE_ENV` (Vercel handles it; setting it to `production` would skip the dev dependencies the build needs) or `VITE_API_URL` (production builds already call `/api/v1` on the same domain). `CLIENT_URL` and `CORS_ORIGINS` default to your production `*.vercel.app` URL; set both if you add a custom domain.
+4. Deploy. On production deployments the build first applies database migrations through `DIRECT_URL` ([`scripts/vercel-build.js`](scripts/vercel-build.js)), then builds the server and the client. Preview deployments skip migrations.
+5. Create an admin: sign up on the site, then in Supabase's **SQL Editor** run `UPDATE "User" SET role = 'ADMIN' WHERE email = 'you@example.com';`.
+
+**Check after the first deploy:**
+
+1. Open `https://<your-app>.vercel.app/health`; it should show `{"status":"ok"}`.
+2. Sign up, open the verification email and verify, then upload a project with images.
+3. Sign out, use "Forgot password", and sign in with the new password.
+4. Sign in again in Safari or a private window and confirm you stay signed in after a reload.
+
+**Limits on Vercel:** a request body can't exceed 4.5 MB. The browser compresses images before upload to stay under this, and shows a clear message if a set of screenshots is still too large together. Functions are stopped after 30 seconds (`maxDuration` in `vercel.json`).
 
 ---
 
@@ -288,8 +305,11 @@ Make sure the API's `CORS_ORIGINS` includes the exact Vercel origin (scheme and 
 | `Invalid environment configuration` on start | Check the variable named in the message in `server/.env` |
 | `Can't reach database server` | Start `npm run db:local`, or fix `DATABASE_URL` |
 | `pre-existing shared memory block is still in use` | An old embedded Postgres is still running. Stop the `postgres.exe` processes for that data directory (Task Manager) and retry |
-| Signed in, but requests return 401 in production | Set `VITE_API_URL=/api/v1` on Vercel and point the `/api` rewrite in `client/vercel.json` at your Render URL. Calling the Render URL directly makes the cookies third-party, and many browsers block them |
-| Server exits with `Missing required production configuration` | Set the variables it names (Supabase, `SMTP_HOST`, `EMAIL_FROM`) in Render |
+| "Something went wrong" on every form in production | The API function isn't answering. Open `/health` on your site. If it fails, check **Vercel → Deployments → (latest) → Functions/Logs** for the error |
+| Function logs show `Missing required production configuration` | Set the variables it names (Supabase, `SMTP_HOST`, `EMAIL_FROM`) in Vercel, then redeploy |
+| Build fails with `DIRECT_URL is required` | Add the Supabase session pooler string as `DIRECT_URL` |
+| `prepared statement "s0" already exists` | `DATABASE_URL` is missing `?pgbouncer=true` |
+| "The upload is too large" | The images together exceed Vercel's 4.5 MB request limit even after compression. Upload fewer screenshots at a time |
 | "Verify your email" banner and no email arrived | In development the link is printed in the API logs. In production, check the SMTP settings and the API logs for `Failed to send email`, then use **Resend email** in the banner |
-| Everyone gets "Too many requests" at once | `TRUST_PROXY` is too low, so all visitors share one proxy IP. Use `2` behind the Vercel rewrite |
+| Everyone gets "Too many requests" at once | `TRUST_PROXY` doesn't match the number of proxies, so all visitors share one IP. On Vercel leave it at `1` |
 | Slow installs or file-lock errors (`EPERM`) | The repo is in a OneDrive-synced folder. Move it somewhere not synced, or pause syncing while installing |

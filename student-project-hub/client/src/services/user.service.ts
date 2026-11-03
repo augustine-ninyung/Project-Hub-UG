@@ -7,6 +7,7 @@ import type {
   SelfUser,
   UserSummary,
 } from '@/types/api';
+import { prepareUploads } from '@/utils/compress-image';
 import { api, request, type ApiEnvelope } from './api';
 
 export interface ProfileUpdate {
@@ -27,9 +28,10 @@ export const userService = {
   active: (limit = 8) => request<ActiveUser[]>({ url: '/users/active', params: { limit } }),
   updateMe: (data: ProfileUpdate) =>
     request<{ user: SelfUser }>({ method: 'PATCH', url: '/users/me', data }).then((d) => d.user),
-  uploadAvatar: (file: File) => {
+  uploadAvatar: async (file: File) => {
+    const [avatar] = await prepareUploads([file]);
     const form = new FormData();
-    form.append('avatar', file);
+    form.append('avatar', avatar!);
     return request<{ user: SelfUser }>({ method: 'POST', url: '/users/me/avatar', data: form }).then(
       (d) => d.user,
     );

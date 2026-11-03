@@ -2,7 +2,9 @@ import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import type { PaginationMeta } from '@/types/api';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api/v1',
+  // Production builds are served from the same origin as the API (Vercel).
+  baseURL:
+    import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? '/api/v1' : 'http://localhost:4000/api/v1'),
   withCredentials: true,
   // Required by the server's CSRF protection on state-changing requests.
   headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -68,13 +70,19 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
 
 // ─── Error helpers ─────────────────────────────────────────────────────
 
+/** An error raised in the browser before a request is sent; its message is shown as-is. */
+export class ClientError extends Error {}
+
 export function getErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.') {
+  if (error instanceof ClientError) return error.message;
   if (error instanceof AxiosError) {
     const body = error.response?.data as ApiErrorBody | undefined;
     if (body?.error?.message) {
       const first = body.error.details?.[0];
       return body.error.code === 'VALIDATION_ERROR' && first ? first.message : body.error.message;
     }
+    // Responses without our JSON body come from the hosting platform, not the API.
+    if (error.response?.status === 413) return 'The upload is too large. Try fewer or smaller images.';
     if (error.code === 'ERR_NETWORK') return 'Cannot reach the server. Check your connection.';
     if (error.code === 'ECONNABORTED') return 'The request timed out. Please try again.';
   }

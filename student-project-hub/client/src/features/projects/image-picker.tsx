@@ -2,14 +2,15 @@ import { ImagePlus, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from 'react';
 import { cn } from '@/utils/cn';
 
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Originals can be large: they are compressed in the browser before upload. */
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 export const MAX_SCREENSHOTS = 8;
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 /** Client-side checks for fast feedback; the server re-validates every file. */
 export function validateImage(file: File): string | null {
   if (!ACCEPTED.includes(file.type)) return `${file.name}: only JPEG, PNG, WebP or GIF images are allowed`;
-  if (file.size > MAX_IMAGE_BYTES) return `${file.name}: images must be 5 MB or smaller`;
+  if (file.size > MAX_IMAGE_BYTES) return `${file.name}: images must be 20 MB or smaller`;
   return null;
 }
 
@@ -118,7 +119,7 @@ export function CoverPicker({ file, existingUrl, onChange, onRemoveExisting, onE
     <DropZone
       className="aspect-video"
       label="Upload a cover image"
-      hint="16:9 works best · JPEG, PNG, WebP or GIF · max 5 MB"
+      hint="16:9 works best · JPEG, PNG, WebP or GIF · max 20 MB"
       onFiles={([f]) => {
         if (!f) return;
         const err = validateImage(f);

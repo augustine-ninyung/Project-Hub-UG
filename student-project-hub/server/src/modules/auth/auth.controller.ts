@@ -8,9 +8,9 @@ import type { IssuedSession } from './auth.service.js';
 export const REFRESH_COOKIE = 'refresh_token';
 const REFRESH_PATH = '/api/v1/auth';
 
-// In production the client reaches the API through a same-origin rewrite on
-// Vercel, so Lax first-party cookies work even where third-party cookies are
-// blocked. COOKIE_SAME_SITE=none supports a cross-site setup instead.
+// In production the client and API are served from the same Vercel origin, so
+// Lax first-party cookies work even where third-party cookies are blocked.
+// COOKIE_SAME_SITE=none supports a cross-site setup instead.
 // CSRF is additionally handled by csrfProtection.
 const baseCookie: CookieOptions = {
   httpOnly: true,

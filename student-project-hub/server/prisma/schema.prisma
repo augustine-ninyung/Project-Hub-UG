@@ -322,3 +322,13 @@ model Report {
   @@index([status, createdAt])
   @@index([reporterId])
 }
+
+// Shared counters for the auth rate limits. Serverless instances do not share
+// memory, so the limits live in the database (see rate-limit-store.ts).
+model RateLimit {
+  key     String   @id
+  hits    Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}
