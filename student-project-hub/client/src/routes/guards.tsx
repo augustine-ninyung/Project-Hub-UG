@@ -26,6 +26,13 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   return children;
 }
 
+/** "/" is the marketing landing page for visitors and the dashboard for members. */
+export function HomeEntry({ guest, member }: { guest: ReactNode; member: ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  if (isLoading) return <PageLoader />;
+  return isAuthenticated ? member : guest;
+}
+
 /** Login/register pages redirect signed-in users home. */
 export function GuestOnly({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();

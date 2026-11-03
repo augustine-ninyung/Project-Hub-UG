@@ -2,6 +2,7 @@ import type { AxiosProgressEvent } from 'axios';
 import type {
   Category,
   CommentNode,
+  CommunityStats,
   Contributor,
   ProjectCard,
   ProjectDetail,
@@ -125,4 +126,5 @@ export const metaService = {
   categories: () => request<Category[]>({ url: '/categories' }),
   technologies: (search?: string) =>
     request<Technology[]>({ url: '/technologies', params: { search: search || undefined } }),
+  stats: () => request<CommunityStats>({ url: '/stats' }),
 };

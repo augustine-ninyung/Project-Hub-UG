@@ -3,10 +3,11 @@ import { Route, Routes } from 'react-router-dom';
 import { PageLoader } from '@/components/common/states';
 import { AppLayout } from '@/layouts/app-layout';
 import { AuthLayout } from '@/layouts/auth-layout';
-import { GuestOnly, RequireAdmin, RequireAuth } from './guards';
+import { GuestOnly, HomeEntry, RequireAdmin, RequireAuth } from './guards';
 
 // Route-level code splitting keeps the initial bundle small.
 const HomePage = lazy(() => import('@/pages/home-page'));
+const LandingPage = lazy(() => import('@/pages/landing-page'));
 const ExplorePage = lazy(() => import('@/pages/explore-page'));
 const ProjectDetailPage = lazy(() => import('@/pages/project-detail-page'));
 const NewProjectPage = lazy(() => import('@/pages/new-project-page'));
@@ -26,8 +27,20 @@ export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        <Route
+          index
+          element={
+            <HomeEntry
+              guest={<LandingPage />}
+              member={
+                <AppLayout>
+                  <HomePage />
+                </AppLayout>
+              }
+            />
+          }
+        />
         <Route element={<AppLayout />}>
-          <Route index element={<HomePage />} />
           <Route path="explore" element={<ExplorePage />} />
           <Route path="projects/:id" element={<ProjectDetailPage />} />
           <Route path="u/:username" element={<ProfilePage />} />

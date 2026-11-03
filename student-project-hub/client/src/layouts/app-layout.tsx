@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '@/components/layout/navbar';
 import { SidebarNav } from '@/components/layout/sidebar';
@@ -9,7 +9,7 @@ import { Dialog, SheetContent } from '@/components/ui/dialog';
  * Desktop (lg+): full sidebar. Tablet (md): icon rail. Mobile: top bar with a
  * slide-in navigation sheet.
  */
-export function AppLayout() {
+export function AppLayout({ children }: { children?: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
 
@@ -45,7 +45,7 @@ export function AppLayout() {
         <Navbar onOpenMenu={() => setMenuOpen(true)} />
         <VerifyEmailBanner />
         <main id="main" className="mx-auto w-full max-w-7xl px-4 py-6 sm:py-8 lg:px-8">
-          <Outlet />
+          {children ?? <Outlet />}
         </main>
       </div>
     </div>

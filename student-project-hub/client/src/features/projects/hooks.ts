@@ -52,6 +52,10 @@ export function useCategories() {
   return useQuery({ queryKey: ['categories'], queryFn: metaService.categories, staleTime: 5 * 60_000 });
 }
 
+export function useCommunityStats() {
+  return useQuery({ queryKey: ['stats'], queryFn: metaService.stats, staleTime: 60_000 });
+}
+
 export function useTechnologies(search = '') {
   return useQuery({
     queryKey: ['technologies', search],

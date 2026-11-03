@@ -60,6 +60,13 @@ export interface Category {
   projectCount?: number;
 }
 
+export interface CommunityStats {
+  projects: number;
+  students: number;
+  universities: number;
+  likes: number;
+}
+
 export interface Technology {
   id: string;
   name: string;

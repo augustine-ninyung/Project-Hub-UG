@@ -25,6 +25,22 @@ metaRouter.get('/categories', async (_req: Request, res: Response) => {
   );
 });
 
+/** Public community totals for the landing page; only public content is counted. */
+metaRouter.get('/stats', async (_req: Request, res: Response) => {
+  const [projects, students, universities, likes] = await Promise.all([
+    prisma.project.count({ where: { visibility: 'PUBLIC' } }),
+    prisma.user.count({ where: { role: 'STUDENT', status: 'ACTIVE' } }),
+    prisma.user.findMany({
+      where: { status: 'ACTIVE' },
+      distinct: ['university'],
+      select: { university: true },
+    }),
+    prisma.like.count({ where: { project: { visibility: 'PUBLIC' } } }),
+  ]);
+  res.set('Cache-Control', 'public, max-age=60');
+  sendSuccess(res, { projects, students, universities: universities.length, likes });
+});
+
 const technologiesQuery = z.object({
   search: z.string().trim().max(40).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(40),

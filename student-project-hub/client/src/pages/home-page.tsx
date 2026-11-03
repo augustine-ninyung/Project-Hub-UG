@@ -1,4 +1,4 @@
-import { ArrowRight, Plus, Sparkles, UserPlus } from 'lucide-react';
+import { Plus, Sparkles, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Section } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
@@ -24,38 +24,8 @@ function greeting() {
 function Welcome() {
   const { user } = useAuth();
 
-  if (!user) {
-    return (
-      <Card className="relative overflow-hidden p-6 sm:p-8">
-        <div
-          aria-hidden
-          className="absolute inset-y-0 right-0 hidden w-1/2 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(to_left,black,transparent)] md:block"
-        />
-        <div className="relative max-w-xl space-y-4">
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">
-            Student project community
-          </p>
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Show what you've built. Discover what others are building.
-          </h1>
-          <p className="text-muted-foreground">
-            Share websites, apps, AI models, hardware and designs with students across
-            universities — and find collaborators for your next idea.
-          </p>
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button asChild size="lg">
-              <Link to="/register">Join the community</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/explore">
-                Explore projects <ArrowRight />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  // Signed-out visitors get the landing page at "/" instead of this dashboard.
+  if (!user) return null;
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
