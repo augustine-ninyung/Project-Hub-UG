@@ -1,0 +1,41 @@
+# Render Blueprint for the API. The client deploys separately to Vercel.
+services:
+  - type: web
+    name: student-project-hub-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build -w server
+    preDeployCommand: npm run db:deploy -w server
+    startCommand: npm start -w server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: API_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: project-hub
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

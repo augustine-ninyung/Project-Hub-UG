@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Local data
+server/uploads/
+server/.uploads-test/
+server/.pgdata/
+server/.pgdata-test/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
