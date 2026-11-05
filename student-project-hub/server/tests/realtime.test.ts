@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { projectTopic, realtime, userTopic } from '../src/services/realtime.service.js';
+import { FEED_TOPIC, projectTopic, realtime, userTopic } from '../src/services/realtime.service.js';
 import { createCategory, signUp } from './helpers.js';
 
 const send = vi.fn(async (_topics: string[]) => undefined);
@@ -36,8 +36,32 @@ describe('live update pings', () => {
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]![0].sort()).toEqual(
-      [projectTopic(projectId), userTopic(owner.user.id)].sort(),
+      [projectTopic(projectId), FEED_TOPIC, userTopic(owner.user.id)].sort(),
     );
+  });
+
+  it('pings the feed when a project is created, edited or deleted', async () => {
+    const category = await createCategory('Robotics');
+    const created = await owner.agent
+      .post('/api/v1/projects')
+      .field(
+        'data',
+        JSON.stringify({
+          title: 'Rover',
+          description: 'An autonomous delivery rover for campus.',
+          categoryId: category.id,
+          technologies: ['ROS'],
+        }),
+      )
+      .expect(201);
+    const id = created.body.data.id;
+    expect(send.mock.calls.at(-1)![0]).toEqual(expect.arrayContaining([FEED_TOPIC, projectTopic(id)]));
+
+    await owner.agent.patch(`/api/v1/projects/${id}`).field('data', JSON.stringify({ title: 'Rover v2' })).expect(200);
+    expect(send.mock.calls.at(-1)![0]).toEqual(expect.arrayContaining([FEED_TOPIC, projectTopic(id)]));
+
+    await owner.agent.delete(`/api/v1/projects/${id}`).expect(204);
+    expect(send.mock.calls.at(-1)![0]).toEqual(expect.arrayContaining([FEED_TOPIC, projectTopic(id)]));
   });
 
   it('pings the project and the parent author on a reply', async () => {
@@ -55,7 +79,7 @@ describe('live update pings', () => {
 
     // The owner replying on their own project notifies only the commenter.
     expect(send.mock.calls[0]![0].sort()).toEqual(
-      [projectTopic(projectId), userTopic(commenter.id)].sort(),
+      [projectTopic(projectId), FEED_TOPIC, userTopic(commenter.id)].sort(),
     );
   });
 

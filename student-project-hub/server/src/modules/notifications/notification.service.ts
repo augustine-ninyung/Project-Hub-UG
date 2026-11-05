@@ -1,4 +1,4 @@
-import type { NotificationType, Prisma } from '@prisma/client';
+import type { NotificationType, Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../config/prisma.js';
 import { queueTopic, userTopic } from '../../services/realtime.service.js';
 import { ApiError } from '../../utils/api-error.js';

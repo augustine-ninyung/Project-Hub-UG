@@ -1,5 +1,5 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../generated/prisma/client.js';
 import multer from 'multer';
 import { ZodError } from 'zod';
 import { isProduction } from '../config/env.js';

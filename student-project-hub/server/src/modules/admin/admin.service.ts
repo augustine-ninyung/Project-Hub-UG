@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../config/prisma.js';
 import type { AuthUser } from '../../types/express.js';
 import { ApiError } from '../../utils/api-error.js';

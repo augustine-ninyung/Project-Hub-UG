@@ -1,0 +1,6 @@
+{
+  // The server and client each have their own tsconfig. This root config
+  // includes no files so Vercel's function builder (which looks for the
+  // nearest tsconfig) doesn't type-check the client with default settings.
+  "files": []
+}

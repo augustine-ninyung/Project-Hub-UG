@@ -1,5 +1,5 @@
 import request from 'supertest';
-import type { Role } from '@prisma/client';
+import type { Role } from '../src/generated/prisma/client.js';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/config/prisma.js';
 

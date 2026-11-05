@@ -3,13 +3,17 @@
 // (likeCount, commentCount) are denormalised and maintained transactionally
 // by the services so feeds can sort/display them without aggregate queries.
 
+// The client is generated into src/generated (git-ignored) as TypeScript and
+// compiled with the server. The connection URL lives in prisma.config.ts.
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {

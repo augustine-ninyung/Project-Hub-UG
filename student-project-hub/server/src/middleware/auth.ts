@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
-import type { Role } from '@prisma/client';
+import type { Role } from '../generated/prisma/client.js';
 import { env } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
 import { ApiError } from '../utils/api-error.js';

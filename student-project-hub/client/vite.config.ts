@@ -4,6 +4,12 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 
+// Absolute site URL for the social tags in index.html (%VITE_SITE_URL%).
+// On Vercel it defaults to the production domain.
+process.env.VITE_SITE_URL ??= process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : 'http://localhost:5173';
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {

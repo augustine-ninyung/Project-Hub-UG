@@ -18,6 +18,9 @@ const outbox = new AsyncLocalStorage<Set<string>>();
 
 export const projectTopic = (projectId: string) => `project:${projectId}`;
 
+/** Pinged whenever any project's cards change (likes, comments, new, edited, deleted). */
+export const FEED_TOPIC = 'projects:feed';
+
 /**
  * Per-user topic for notification pings. The name is derived from a server
  * secret, so only the user (who receives it from /auth/me) knows it.
@@ -30,6 +33,12 @@ export function userTopic(userId: string) {
 /** Queues a ping for the current request. Outside a request it is ignored. */
 export function queueTopic(topic: string) {
   outbox.getStore()?.add(topic);
+}
+
+/** A project's page and every project list (counts, new or removed cards) need refreshing. */
+export function projectChanged(projectId: string) {
+  queueTopic(projectTopic(projectId));
+  queueTopic(FEED_TOPIC);
 }
 
 async function sendBroadcast(topics: string[]) {

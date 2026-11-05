@@ -1,6 +1,7 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../config/prisma.js';
 import { MAX_SCREENSHOTS } from '../../middleware/upload.js';
+import { projectChanged } from '../../services/realtime.service.js';
 import { removeImages, storeImage, type StoredFile } from '../../services/storage.service.js';
 import type { AuthUser } from '../../types/express.js';
 import { ApiError } from '../../utils/api-error.js';
@@ -361,6 +362,7 @@ export async function createProject(user: AuthUser, input: CreateProjectInput, f
       );
       return created;
     });
+    projectChanged(project.id);
     return getProject(project.id, user);
   } catch (err) {
     await removeImages(images.all.map((s) => s.path));
@@ -438,6 +440,7 @@ export async function updateProject(
     ...removed.map((r) => r.path),
     replaceCover ? current.coverImagePath : null,
   ]);
+  projectChanged(id);
   return getProject(id, user);
 }
 
@@ -448,5 +451,6 @@ export async function deleteProject(id: string, user: AuthUser) {
     select: { coverImagePath: true, images: { select: { path: true } } },
   });
   await prisma.project.delete({ where: { id } });
+  projectChanged(id);
   await removeImages([project.coverImagePath, ...project.images.map((i) => i.path)]);
 }

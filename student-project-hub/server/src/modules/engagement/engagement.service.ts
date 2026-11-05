@@ -1,6 +1,6 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../config/prisma.js';
-import { projectTopic, queueTopic } from '../../services/realtime.service.js';
+import { projectChanged } from '../../services/realtime.service.js';
 import type { AuthUser } from '../../types/express.js';
 import { ApiError } from '../../utils/api-error.js';
 import { notify } from '../notifications/notification.service.js';
@@ -12,7 +12,7 @@ import { userSummarySelect } from '../users/user.select.js';
 /** Idempotent: liking twice is a no-op thanks to the (userId, projectId) unique key. */
 export async function likeProject(projectId: string, user: AuthUser) {
   const project = await findVisibleProject(projectId, user);
-  queueTopic(projectTopic(projectId));
+  projectChanged(projectId);
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -58,7 +58,7 @@ export async function likeProject(projectId: string, user: AuthUser) {
 
 export async function unlikeProject(projectId: string, user: AuthUser) {
   await findVisibleProject(projectId, user);
-  queueTopic(projectTopic(projectId));
+  projectChanged(projectId);
   return prisma.$transaction(async (tx) => {
     const { count } = await tx.like.deleteMany({ where: { userId: user.id, projectId } });
     const { likeCount } = count
@@ -164,7 +164,7 @@ export async function createComment(
     });
     if (!parent) throw ApiError.badRequest('The comment you are replying to no longer exists');
   }
-  queueTopic(projectTopic(projectId));
+  projectChanged(projectId);
 
   return prisma.$transaction(async (tx) => {
     const comment = await tx.comment.create({
@@ -225,7 +225,7 @@ async function findOwnComment(commentId: string, user: AuthUser, allowModerators
 
 export async function updateComment(commentId: string, user: AuthUser, content: string) {
   const comment = await findOwnComment(commentId, user, false);
-  queueTopic(projectTopic(comment.projectId));
+  projectChanged(comment.projectId);
   const updated = await prisma.comment.update({
     where: { id: commentId },
     data: { content, editedAt: new Date() },
@@ -237,7 +237,7 @@ export async function updateComment(commentId: string, user: AuthUser, content: 
 /** Soft delete keeps the thread structure intact for replies. */
 export async function deleteComment(commentId: string, user: AuthUser) {
   const comment = await findOwnComment(commentId, user, true);
-  queueTopic(projectTopic(comment.projectId));
+  projectChanged(comment.projectId);
   await prisma.$transaction([
     prisma.comment.update({
       where: { id: commentId },

@@ -25,6 +25,7 @@ import {
   useFeaturedProjects,
   useProjects,
 } from '@/features/projects/hooks';
+import { LiveFeed } from '@/features/projects/live-feed';
 import { CoverFallback } from '@/features/projects/project-card';
 import { ProjectGrid } from '@/features/projects/project-grid';
 import type { ProjectCard } from '@/types/api';
@@ -45,6 +46,7 @@ export default function LandingPage() {
       >
         Skip to content
       </a>
+      <LiveFeed />
       <LandingHeader />
       <main id="main">
         <Hero />

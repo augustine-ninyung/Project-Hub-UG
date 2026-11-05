@@ -1,4 +1,4 @@
-import type { Prisma, User } from '@prisma/client';
+import type { Prisma, User } from '../../generated/prisma/client.js';
 import { userTopic } from '../../services/realtime.service.js';
 
 /** Minimal public user info embedded in projects, comments, notifications. */

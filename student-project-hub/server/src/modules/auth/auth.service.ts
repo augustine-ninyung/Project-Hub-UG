@@ -1,5 +1,5 @@
 import argon2 from 'argon2';
-import type { AuthTokenType } from '@prisma/client';
+import type { AuthTokenType } from '../../generated/prisma/client.js';
 import { env } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { signAccessToken } from '../../middleware/auth.js';

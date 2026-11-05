@@ -8,8 +8,9 @@
  * All seeded students use the password "Password123".
  * Admin: admin@studenthub.dev / Admin12345
  */
-import { PrismaClient, type ProjectStatus } from '@prisma/client';
 import argon2 from 'argon2';
+import { prisma } from '../src/config/prisma.js';
+import type { ProjectStatus } from '../src/generated/prisma/client.js';
 import { storeImageBuffer } from '../src/services/storage.service.js';
 import { slugify } from '../src/utils/common-schemas.js';
 
@@ -17,8 +18,6 @@ if (process.env.NODE_ENV === 'production' && process.env.SEED_FORCE !== 'true') 
   console.error('Refusing to seed a production database (set SEED_FORCE=true to override).');
   process.exit(1);
 }
-
-const prisma = new PrismaClient();
 
 // Deterministic PRNG so every seed run produces the same data shape.
 let state = 42;

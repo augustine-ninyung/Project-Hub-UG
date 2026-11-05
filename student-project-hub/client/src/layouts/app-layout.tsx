@@ -5,6 +5,7 @@ import { SidebarNav } from '@/components/layout/sidebar';
 import { VerifyEmailBanner } from '@/components/layout/verify-banner';
 import { Dialog, SheetContent } from '@/components/ui/dialog';
 import { LiveNotifications } from '@/features/notifications/live-notifications';
+import { LiveFeed } from '@/features/projects/live-feed';
 
 /**
  * Desktop (lg+): full sidebar. Tablet (md): icon rail. Mobile: top bar with a
@@ -43,6 +44,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
       </Dialog>
 
       <LiveNotifications />
+      <LiveFeed />
 
       <div className="md:pl-16 lg:pl-60">
         <Navbar onOpenMenu={() => setMenuOpen(true)} />

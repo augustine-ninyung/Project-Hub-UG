@@ -7,12 +7,24 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "{node_modules/@img/**,node_modules/argon2/**,node_modules/.prisma/client/**}"
+      "includeFiles": "{node_modules/@img/**,node_modules/argon2/**,node_modules/@prisma/client/runtime/client.mjs,node_modules/@prisma/client/runtime/query_compiler_fast_bg.postgresql.*,client/dist/index.html}"
     }
   },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
+    { "source": "/og/:path*", "destination": "/api" },
+    {
+      "source": "/projects/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(bot|crawler|spider|facebookexternalhit|facebot|whatsapp|telegram|slack|discord|linkedin|twitter|skype|embedly|pinterest|vkshare|redditbot|applebot|iframely|quora link preview|outbrain|nuzzel|bitlybot|google-inspectiontool|mastodon).*"
+        }
+      ],
+      "destination": "/api"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

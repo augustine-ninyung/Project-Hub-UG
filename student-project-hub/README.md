@@ -5,7 +5,7 @@ A community platform where students showcase projects, discover each other's wor
 | | |
 |---|---|
 | **Client** | React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui-style components on Radix, TanStack Query, React Router, React Hook Form + Zod, Axios |
-| **Server** | Node.js, Express 5, TypeScript, Prisma 6, PostgreSQL, Zod |
+| **Server** | Node.js, Express 5, TypeScript, Prisma 7 (with the `pg` driver adapter), PostgreSQL, Zod |
 | **Auth** | Argon2id password hashing, short-lived JWT access cookie + rotating refresh token (httpOnly cookies), email verification, password reset, role-based access |
 | **Storage** | Supabase Storage (falls back to local disk in development) |
 | **Tests** | Vitest + Supertest against a real PostgreSQL (server), Vitest + Testing Library (client) |
@@ -74,7 +74,9 @@ student-project-hub/
 ├── vercel.json               # Vercel build settings and routing
 ├── api/index.js              # Vercel Function that runs the Express API
 ├── scripts/vercel-build.js   # Vercel build: migrations (production) + builds
+├── tsconfig.json             # empty on purpose (stops Vercel type-checking the client)
 ├── server/
+│   ├── prisma.config.ts      # Prisma 7 config: schema, migrations, seed, DATABASE_URL
 │   ├── prisma/
 │   │   ├── schema.prisma     # data model
 │   │   ├── migrations/       # SQL migrations (committed)
@@ -86,11 +88,12 @@ student-project-hub/
 │   │   ├── routes.ts         # mounts module routers under /api/v1
 │   │   ├── config/           # validated env, Prisma client
 │   │   ├── middleware/       # auth, CSRF, validation, uploads, rate limits, errors
-│   │   ├── services/         # storage (Supabase/local) and email
+│   │   ├── generated/        # Prisma client (git-ignored; `prisma generate` runs on install)
+│   │   ├── services/         # storage (Supabase/local), email, realtime pings
 │   │   ├── utils/            # ApiError, response helpers, token helpers, shared schemas
 │   │   └── modules/          # feature modules: routes → controller → service (+ schemas)
 │   │       ├── auth/  users/  projects/  engagement/  notifications/
-│   │       └── reports/  admin/  meta/
+│   │       └── reports/  admin/  meta/  share/ (link previews)
 │   └── tests/                # API tests (auth, projects, engagement, admin)
 └── client/
     └── src/
@@ -247,7 +250,8 @@ Base path: `/api/v1`. 🔒 means a session is required, ✉️ means a verified 
 - **XSS:** user content is stored as plain text and rendered as text by React. URLs must use `http(s)` (no `javascript:` links). Helmet sets secure headers.
 - **Uploads:** the browser first downscales images to at most 1920 px and re-encodes them, so a request stays under Vercel's 4.5 MB body limit (originals up to 20 MB can be picked). On the server, files are buffered in memory with a 5 MB limit and at most 9 per request, and only image MIME types are accepted. Every file is then decoded and re-encoded as WebP with sharp. This rejects files that aren't real images, strips EXIF and embedded payloads, and resizes for performance.
 - **Rate limiting:** a stricter per-IP limit on auth endpoints and a per-account limit on login and password-reset requests (so brute force is capped even if IPs rotate). Both are counted in PostgreSQL (`RateLimit` table) because serverless instances don't share memory. A general per-IP limit and a write limit on likes, comments, reports and invites are kept in memory per instance, as lighter abuse damping.
-- **Live updates** use Supabase Realtime Broadcast. After a successful like, comment or notification, the server sends a bare "changed" ping (no data) to the project's topic and to the recipient's topic; open pages then refetch through the API, so every read is still authorised. Each user's topic name is an HMAC of their ID with a server secret, so it can't be guessed. Pings are sent just before the response, after transactions commit, and never for failed requests.
+- **Live updates** use Supabase Realtime Broadcast. After a successful like, comment, notification or project change, the server sends a bare "changed" ping (no data) to the project's topic, a shared `projects:feed` topic (so home, Explore and profile lists refresh) and the recipient's topic; open pages then refetch through the API, so every read is still authorised.
+- **Link previews:** on Vercel, requests for `/projects/:id` from known social crawlers (WhatsApp, LinkedIn, X, Slack, …) are routed to the API, which returns the app's HTML with that project's Open Graph tags; `/og/projects/:id.jpg` serves a 1200×630 JPEG of the cover. Only public projects are described, and user text is HTML-escaped. Browsers always get the static app. Each user's topic name is an HMAC of their ID with a server secret, so it can't be guessed. Pings are sent just before the response, after transactions commit, and never for failed requests.
 - **Secrets** come only from environment variables. `.env` files are git-ignored.
 
 ---
