@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { env } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { validate } from '../../middleware/validate.js';
 import { sendSuccess } from '../../utils/response.js';
@@ -23,6 +24,16 @@ metaRouter.get('/categories', async (_req: Request, res: Response) => {
     res,
     categories.map(({ _count, ...c }) => ({ ...c, projectCount: _count.projects })),
   );
+});
+
+/**
+ * Settings for live updates. The anon key is public by design: it only lets
+ * browsers listen for "changed" pings, which carry no data.
+ */
+metaRouter.get('/realtime', (_req: Request, res: Response) => {
+  const enabled = Boolean(env.SUPABASE_URL && env.SUPABASE_ANON_KEY && env.SUPABASE_SERVICE_ROLE_KEY);
+  res.set('Cache-Control', 'public, max-age=300');
+  sendSuccess(res, enabled ? { url: env.SUPABASE_URL, anonKey: env.SUPABASE_ANON_KEY } : null);
 });
 
 /** Public community totals for the landing page; only public content is counted. */

@@ -132,6 +132,7 @@ student-project-hub/
 | `COOKIE_SAME_SITE` | | `lax` | `lax` when the client and API share a site (local dev and Vercel); `none` only for a cross-site setup |
 | `SUPABASE_URL` | ✅ in prod | | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ in prod | | Service-role key (server-side only, never sent to the client) |
+| `SUPABASE_ANON_KEY` | | | Public `anon` key. Enables live likes, comments and notifications (Supabase Realtime) |
 | `SUPABASE_BUCKET` | | `project-hub` | Name of a **public** storage bucket |
 | `LOCAL_UPLOAD_DIR` | | `uploads` | Local-disk fallback directory when Supabase is not configured |
 | `SMTP_HOST` | ✅ in prod | | SMTP server. In development, if empty, emails are logged to the console |
@@ -246,6 +247,7 @@ Base path: `/api/v1`. 🔒 means a session is required, ✉️ means a verified 
 - **XSS:** user content is stored as plain text and rendered as text by React. URLs must use `http(s)` (no `javascript:` links). Helmet sets secure headers.
 - **Uploads:** the browser first downscales images to at most 1920 px and re-encodes them, so a request stays under Vercel's 4.5 MB body limit (originals up to 20 MB can be picked). On the server, files are buffered in memory with a 5 MB limit and at most 9 per request, and only image MIME types are accepted. Every file is then decoded and re-encoded as WebP with sharp. This rejects files that aren't real images, strips EXIF and embedded payloads, and resizes for performance.
 - **Rate limiting:** a stricter per-IP limit on auth endpoints and a per-account limit on login and password-reset requests (so brute force is capped even if IPs rotate). Both are counted in PostgreSQL (`RateLimit` table) because serverless instances don't share memory. A general per-IP limit and a write limit on likes, comments, reports and invites are kept in memory per instance, as lighter abuse damping.
+- **Live updates** use Supabase Realtime Broadcast. After a successful like, comment or notification, the server sends a bare "changed" ping (no data) to the project's topic and to the recipient's topic; open pages then refetch through the API, so every read is still authorised. Each user's topic name is an HMAC of their ID with a server secret, so it can't be guessed. Pings are sent just before the response, after transactions commit, and never for failed requests.
 - **Secrets** come only from environment variables. `.env` files are git-ignored.
 
 ---
@@ -280,6 +282,7 @@ Supabase doesn't send email for your app. Create an SMTP account (Resend, Brevo,
    | `JWT_ACCESS_SECRET` | 48+ random characters: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
    | `SUPABASE_URL` | Project URL |
    | `SUPABASE_SERVICE_ROLE_KEY` | `service_role` key |
+   | `SUPABASE_ANON_KEY` | `anon` key (same page), for live updates |
    | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | From your email provider |
    | `EMAIL_FROM` | e.g. `ProjectHub <no-reply@yourdomain.com>` (a sender your provider has verified) |
 

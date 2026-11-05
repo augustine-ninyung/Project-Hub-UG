@@ -1,5 +1,6 @@
 import type { NotificationType, Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
+import { queueTopic, userTopic } from '../../services/realtime.service.js';
 import { ApiError } from '../../utils/api-error.js';
 import { userSummarySelect } from '../users/user.select.js';
 
@@ -21,6 +22,7 @@ export async function notify(db: Db, inputs: NotifyInput | NotifyInput[]) {
   );
   if (list.length === 0) return;
   await db.notification.createMany({ data: list });
+  for (const n of list) queueTopic(userTopic(n.recipientId));
 }
 
 const notificationInclude = {

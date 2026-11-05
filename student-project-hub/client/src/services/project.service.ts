@@ -130,4 +130,11 @@ export const metaService = {
   technologies: (search?: string) =>
     request<Technology[]>({ url: '/technologies', params: { search: search || undefined } }),
   stats: () => request<CommunityStats>({ url: '/stats' }),
+  /** Live-update settings, or null when the server has them switched off. */
+  realtime: () => request<RealtimeConfig | null>({ url: '/realtime' }),
 };
+
+export interface RealtimeConfig {
+  url: string;
+  anonKey: string;
+}

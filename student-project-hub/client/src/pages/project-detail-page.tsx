@@ -10,6 +10,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { GithubIcon } from '@/components/common/brand-icons';
@@ -26,7 +27,13 @@ import {
 import { Badge, Card, UserAvatar } from '@/components/ui/misc';
 import { useAuth } from '@/context/auth-context';
 import { CommentSection } from '@/features/comments/comment-section';
-import { useDeleteProject, useProject, useRelatedProjects } from '@/features/projects/hooks';
+import {
+  projectKeys,
+  useDeleteProject,
+  useProject,
+  useRelatedProjects,
+} from '@/features/projects/hooks';
+import { useLiveTopic } from '@/hooks/use-live-topic';
 import { LikeButton } from '@/features/projects/like-button';
 import { CoverFallback, statusVariant } from '@/features/projects/project-card';
 import { ProjectGrid } from '@/features/projects/project-grid';
@@ -45,6 +52,13 @@ export default function ProjectDetailPage() {
   const deleteProject = useDeleteProject();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Live likes and comments: refetch when anyone engages with this project.
+  useLiveTopic(id ? `project:${id}` : null, () => {
+    void queryClient.invalidateQueries({ queryKey: projectKeys.detail(id!) });
+    void queryClient.invalidateQueries({ queryKey: projectKeys.comments(id!) });
+  });
 
   if (isLoading) return <PageLoader />;
   if (getStatus(error) === 404 || getStatus(error) === 422) {

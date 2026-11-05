@@ -7,6 +7,7 @@ import { env, isTest } from './config/env.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { apiLimiter } from './middleware/rate-limit.js';
+import { realtimeOutbox } from './services/realtime.service.js';
 import { apiRouter } from './routes.js';
 import { LOCAL_UPLOAD_DIR } from './services/storage.service.js';
 
@@ -43,7 +44,7 @@ export function createApp() {
   // Development storage fallback (no Supabase credentials configured).
   app.use('/uploads', express.static(LOCAL_UPLOAD_DIR, { maxAge: '7d', fallthrough: false }));
 
-  app.use('/api/v1', apiLimiter, csrfProtection, apiRouter);
+  app.use('/api/v1', apiLimiter, csrfProtection, realtimeOutbox, apiRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

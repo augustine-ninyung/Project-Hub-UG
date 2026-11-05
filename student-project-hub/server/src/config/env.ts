@@ -24,6 +24,8 @@ const envSchema = z.object({
 
   SUPABASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  /** Public anon key, handed to browsers for live updates (Realtime). Optional. */
+  SUPABASE_ANON_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   SUPABASE_BUCKET: z.string().default('project-hub'),
   /** Local-disk fallback directory, relative to the server folder. */
   LOCAL_UPLOAD_DIR: z.string().default('uploads'),

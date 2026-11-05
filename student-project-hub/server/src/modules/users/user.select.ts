@@ -1,4 +1,5 @@
 import type { Prisma, User } from '@prisma/client';
+import { userTopic } from '../../services/realtime.service.js';
 
 /** Minimal public user info embedded in projects, comments, notifications. */
 export const userSummarySelect = {
@@ -28,5 +29,7 @@ export function toSelfUser(user: User) {
     role: user.role,
     emailVerified: user.emailVerifiedAt !== null,
     createdAt: user.createdAt,
+    /** Private Realtime topic for live notification pings. */
+    realtimeTopic: userTopic(user.id),
   };
 }

@@ -50,6 +50,8 @@ export interface SelfUser extends UserSummary {
   role: Role;
   emailVerified: boolean;
   createdAt: string;
+  /** Private topic for live notification pings. */
+  realtimeTopic?: string;
 }
 
 export interface Category {
