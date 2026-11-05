@@ -27,6 +27,11 @@ adminRouter.patch(
   validate({ params: uuidParam, body: updateUserSchema }),
   controller.updateUser,
 );
+adminRouter.post(
+  '/users/:id/verify-email',
+  validate({ params: uuidParam }),
+  controller.verifyUserEmail,
+);
 
 adminRouter.get('/projects', validate({ query: adminProjectsQuery }), controller.projects);
 adminRouter.patch(

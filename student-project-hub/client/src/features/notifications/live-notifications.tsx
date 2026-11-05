@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useAuth } from '@/context/auth-context';
+import { AUTH_QUERY_KEY, useAuth } from '@/context/auth-context';
 import { useLiveTopic } from '@/hooks/use-live-topic';
 import { notificationService } from '@/services/user.service';
 
@@ -25,6 +25,9 @@ export function LiveNotifications() {
     });
     const newest = latest.items[0];
     if (!newest) return;
+    // An admin verified this account: refresh it so posting unlocks and the
+    // "verify your email" banner goes away without a reload.
+    if (newest.type === 'ACCOUNT_VERIFIED') void queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
     toast(`${newest.actor?.fullName ?? 'Someone'} ${newest.message}`, {
       id: `notification-${newest.id}`,
       icon: <Bell className="size-4 text-primary" aria-hidden />,

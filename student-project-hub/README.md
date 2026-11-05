@@ -213,14 +213,14 @@ npm test -w client    # component tests
 npm run typecheck     # TypeScript, both apps
 ```
 
-**Server (60 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
+**Server (64 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
 
 | File | Covers |
 |---|---|
 | `auth.test.ts` | registration, hashing, duplicates, login by email/username, generic errors, suspended accounts, refresh-token rotation and replay, logout, CSRF, email verification, password reset |
 | `projects.test.ts` | create with images, auth and verified-email rules, validation, fake-image rejection, contributor invites, private-project access, owner/admin-only edit and delete, search/filter/sort/pagination, trending and featured |
 | `engagement.test.ts` | idempotent likes and counts, notifications, threaded comments, author-only edit, soft delete, reports |
-| `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories |
+| `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, manual email verification (admin-only, one-time, unlocks posting at once, notifies the student) |
 | `meta.test.ts` | public stats count only public projects and active students |
 | `rate-limit-store.test.ts` | database-backed rate-limit counters: windows, sharing across instances, concurrency |
 | `realtime.test.ts` | live-update pings for likes, replies and project changes; nothing sent for failed requests; unguessable user topics |
@@ -261,7 +261,7 @@ Base path: `/api/v1`. 🔒 session required · ✉️ verified email required ·
 `GET /categories` · `GET /technologies?search=` · `GET /stats` (public totals for the landing page) · `GET /realtime` (live-update settings for the browser, or `null` when off)
 
 **Admin** 🛡️:
-`GET /admin/statistics` · `GET /admin/activity` · `GET /admin/users` · `PATCH /admin/users/:id` (`{ role?, status? }`) · `GET /admin/projects` · `PATCH /admin/projects/:id/feature` · `DELETE /admin/projects/:id` · `GET /admin/reports?status=` · `PATCH /admin/reports/:id` (`{ status, resolutionNote?, removeContent? }`) · `POST/PATCH/DELETE /admin/categories[/:id]`
+`GET /admin/statistics` · `GET /admin/activity` · `GET /admin/users?search=&role=&status=&verified=` · `PATCH /admin/users/:id` (`{ role?, status? }`) · `POST /admin/users/:id/verify-email` · `GET /admin/projects` · `PATCH /admin/projects/:id/feature` · `DELETE /admin/projects/:id` · `GET /admin/reports?status=` · `PATCH /admin/reports/:id` (`{ status, resolutionNote?, removeContent? }`) · `POST/PATCH/DELETE /admin/categories[/:id]`
 
 **Outside `/api/v1`:**
 `GET /health` · `GET /projects/:id` (link-preview HTML, only for social crawlers on Vercel) · `GET /og/projects/:id.jpg` (1200×630 preview image)
@@ -353,23 +353,15 @@ Supabase doesn't send email for your app. With [Resend](https://resend.com):
 
 ## Running the live site
 
-All SQL below runs in **Supabase → SQL Editor**. Keep the double quotes around table and column names.
+Day-to-day user management happens in **Admin → Users**; no SQL needed:
 
-**Make someone an admin** (they sign out and back in afterwards):
+- **Verify an email by hand** (needed while emails only reach your own address): pick **Unverified only** in the filter, then click **Verify email** next to the person. They can upload and comment straight away, without signing out, and get a notification saying so. Verification can't be undone; use **Suspend** for bad actors.
+- **Make someone an admin** with **Make admin**, or **Suspend** an account, from the same row.
+
+SQL (in **Supabase → SQL Editor**, keeping the double quotes around names) is only needed if no admin can sign in, for example to create the very first admin:
 
 ```sql
 UPDATE "User" SET role = 'ADMIN' WHERE email = 'person@example.com';
-```
-
-**Verify a user by hand** (needed while emails only reach your own address):
-
-```sql
--- Who is waiting?
-SELECT email, username, "fullName", "createdAt" FROM "User"
-WHERE "emailVerifiedAt" IS NULL ORDER BY "createdAt" DESC;
-
--- Verify one account (expect "1 row affected")
-UPDATE "User" SET "emailVerifiedAt" = now() WHERE email = 'person@example.com';
 ```
 
 **Logs.** Use Vercel → your project → **Logs**, or `npx vercel logs -e production` from the project folder. On the free (Hobby) plan, runtime logs are kept for only about **30 minutes**, so reproduce a problem and read the logs right away.
@@ -395,7 +387,7 @@ UPDATE "User" SET "emailVerifiedAt" = now() WHERE email = 'person@example.com';
 | Build fails: `DIRECT_URL is required` or `P1001 Can't reach database server` | `DIRECT_URL` is missing or still contains placeholders/an old password |
 | No verification email; logs: `535 Authentication credentials invalid` | Wrong Resend API key. Create a new key and update `SMTP_PASS`, then redeploy |
 | Logs: `550 The gmail.com domain is not verified` | `EMAIL_FROM` uses an address you can't send from. Use `onboarding@resend.dev` or an address on your verified domain |
-| Logs: `You can only send testing emails to your own email address` | Expected with `onboarding@resend.dev`. Verify a domain in Resend, or verify the user by hand (above) |
+| Logs: `You can only send testing emails to your own email address` | Expected with `onboarding@resend.dev`. Verify a domain in Resend, or click **Verify email** for them in Admin → Users |
 | Likes/comments don't update live | `SUPABASE_ANON_KEY` missing (check `/api/v1/realtime` isn't `null`), or the browser blocks WebSockets. Refreshing still shows the latest data |
 | Share preview shows the old/plain card | Social apps cache previews. New shares pick up changes; WhatsApp/LinkedIn may keep an old preview for a while |
 | A push didn't create a Vercel deployment | GitHub's webhook was lost (happens during GitHub incidents). Push an empty commit (`git commit --allow-empty -m "Trigger deployment"`) or click **Redeploy** |
@@ -407,8 +399,7 @@ UPDATE "User" SET "emailVerifiedAt" = now() WHERE email = 'person@example.com';
 
 ## Known limitations
 
-- **Email reaches only the owner** until a sending domain is verified in Resend (see Deployment step 2). Until then, verify accounts by hand.
+- **Email reaches only the owner** until a sending domain is verified in Resend (see Deployment step 2). Until then, verify accounts with **Verify email** in Admin → Users.
 - **Build-log noise:** each Vercel build prints about 1,900 TypeScript errors from Vercel's function packager type-checking client files. They are harmless (deployments succeed) and don't happen in local builds; the cause on Vercel's side hasn't been identified.
 - **In-memory limits:** the general per-IP and write rate limits are per serverless instance; only the auth limits are shared through the database.
-- **No admin "verify user" button yet**; use the SQL above.
 - **Free plans:** Supabase pausing and the lack of self-service backups (see *Running the live site*).

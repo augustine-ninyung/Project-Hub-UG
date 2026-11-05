@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Check, ExternalLink, Pencil, Search, Shield, ShieldOff, Star, Trash2, X } from 'lucide-react';
+import { Ban, Check, ExternalLink, MailCheck, Pencil, Search, Shield, ShieldOff, Star, Trash2, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -66,12 +66,14 @@ export function AdminUsers() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [verified, setVerified] = useState('');
   const term = useDebounced(search);
-  useEffect(() => setPage(1), [term]);
+  useEffect(() => setPage(1), [term, verified]);
 
   const query = useQuery({
-    queryKey: ['admin', 'users', page, term],
-    queryFn: () => adminService.users({ page, search: term || undefined }),
+    queryKey: ['admin', 'users', page, term, verified],
+    queryFn: () =>
+      adminService.users({ page, search: term || undefined, verified: verified ? verified === 'true' : undefined }),
     placeholderData: keepPreviousData,
   });
   const update = useMutation({
@@ -80,10 +82,22 @@ export function AdminUsers() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
     ...mutationToasts('User updated'),
   });
+  const verify = useMutation({
+    mutationFn: (id: string) => adminService.verifyEmail(id),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
+    ...mutationToasts('Email verified. They can now upload and comment.'),
+  });
 
   return (
     <div className="space-y-4">
-      <SearchInput value={search} onChange={setSearch} placeholder="Search by name, username or email" />
+      <div className="flex flex-wrap gap-2">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, username or email" />
+        <Select value={verified} onChange={(e) => setVerified(e.target.value)} className="w-44" aria-label="Verification filter">
+          <option value="">All users</option>
+          <option value="false">Unverified only</option>
+          <option value="true">Verified only</option>
+        </Select>
+      </div>
       {query.isLoading ? (
         <PageLoader />
       ) : query.error ? (
@@ -117,7 +131,18 @@ export function AdminUsers() {
                 </td>
                 <td className="px-4 py-3">
                   {u.id !== me?.id && (
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap gap-1">
+                      {!u.emailVerifiedAt && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={verify.isPending}
+                          onClick={() => verify.mutate(u.id)}
+                          title={`Mark ${u.email} as verified`}
+                        >
+                          <MailCheck /> Verify email
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

@@ -95,3 +95,72 @@ describe('admin moderation', () => {
     expect(blocked.status).toBe(409);
   });
 });
+
+describe('manual email verification', () => {
+  const postProject = (agent: Awaited<ReturnType<typeof signUp>>['agent'], categoryId: string) =>
+    agent.post('/api/v1/projects').field(
+      'data',
+      JSON.stringify({
+        title: 'Weather station',
+        description: 'A solar-powered weather station that reports every minute.',
+        categoryId,
+        technologies: ['ESP32'],
+      }),
+    );
+
+  it('lets an admin verify a student, who can then post straight away', async () => {
+    const category = await createCategory();
+    const { agent: admin, user: adminUser } = await signUp({ role: 'ADMIN' });
+    const { agent: student, user } = await signUp({ verified: false });
+
+    expect((await postProject(student, category.id)).status).toBe(403);
+
+    const res = await admin.post(`/api/v1/admin/users/${user.id}/verify-email`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.emailVerifiedAt).toBeTruthy();
+
+    // Takes effect on the student's existing session, no re-login needed.
+    expect((await student.get('/api/v1/auth/me')).body.data.user.emailVerified).toBe(true);
+    expect((await postProject(student, category.id)).status).toBe(201);
+
+    const notifications = await prisma.notification.findMany({ where: { recipientId: user.id } });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({ type: 'ACCOUNT_VERIFIED', actorId: adminUser.id });
+
+    const unusedTokens = await prisma.authToken.count({
+      where: { userId: user.id, type: 'EMAIL_VERIFICATION', usedAt: null },
+    });
+    expect(unusedTokens).toBe(0);
+  });
+
+  it('refuses to verify twice and reports unknown users', async () => {
+    const { agent: admin } = await signUp({ role: 'ADMIN' });
+    const { user } = await signUp({ verified: false });
+
+    expect((await admin.post(`/api/v1/admin/users/${user.id}/verify-email`)).status).toBe(200);
+    expect((await admin.post(`/api/v1/admin/users/${user.id}/verify-email`)).status).toBe(409);
+    expect(
+      (await admin.post('/api/v1/admin/users/00000000-0000-4000-8000-000000000000/verify-email')).status,
+    ).toBe(404);
+  });
+
+  it('is admin-only', async () => {
+    const { agent: student } = await signUp();
+    const { user } = await signUp({ verified: false });
+
+    expect((await student.post(`/api/v1/admin/users/${user.id}/verify-email`)).status).toBe(403);
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(after.emailVerifiedAt).toBeNull();
+  });
+
+  it('filters the user list to unverified accounts', async () => {
+    const { agent: admin } = await signUp({ role: 'ADMIN' });
+    const { user: pending } = await signUp({ verified: false });
+    await signUp();
+
+    const res = await admin.get('/api/v1/admin/users?verified=false');
+    expect(res.body.data.map((u: { id: string }) => u.id)).toEqual([pending.id]);
+    const verified = await admin.get('/api/v1/admin/users?verified=true');
+    expect(verified.body.meta.total).toBe(2);
+  });
+});

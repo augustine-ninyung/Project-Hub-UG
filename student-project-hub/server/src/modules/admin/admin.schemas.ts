@@ -6,6 +6,10 @@ export const adminUsersQuery = paginationQuery.extend({
   search: z.string().trim().max(100).optional(),
   role: z.enum(['STUDENT', 'ADMIN']).optional(),
   status: z.enum(['ACTIVE', 'SUSPENDED']).optional(),
+  verified: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional(),
 });
 
 export const updateUserSchema = z

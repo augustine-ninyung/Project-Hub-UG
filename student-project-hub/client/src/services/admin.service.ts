@@ -76,10 +76,11 @@ export const adminService = {
   statistics: () => request<AdminStatistics>({ url: '/admin/statistics' }),
   activity: () => request<ActivityEvent[]>({ url: '/admin/activity' }),
 
-  users: (params: { page: number; search?: string; role?: Role; status?: string }) =>
+  users: (params: { page: number; search?: string; role?: Role; status?: string; verified?: boolean }) =>
     requestPage<AdminUser>({ url: '/admin/users', params }),
   updateUser: (id: string, data: { role?: Role; status?: 'ACTIVE' | 'SUSPENDED' }) =>
     request({ method: 'PATCH', url: `/admin/users/${id}`, data }),
+  verifyEmail: (id: string) => request({ method: 'POST', url: `/admin/users/${id}/verify-email` }),
 
   projects: (params: { page: number; search?: string; featured?: boolean }) =>
     requestPage<AdminProject>({ url: '/admin/projects', params }),

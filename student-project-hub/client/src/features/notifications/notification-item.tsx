@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Reply, UserCheck, UserPlus, type LucideIcon } from 'lucide-react';
+import { BadgeCheck, Heart, MessageCircle, Reply, UserCheck, UserPlus, type LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/ui/misc';
@@ -13,6 +13,7 @@ const ICONS: Record<NotificationType, { icon: LucideIcon; className: string }> =
   COMMENT_REPLIED: { icon: Reply, className: 'bg-primary text-primary-foreground' },
   CONTRIBUTOR_INVITED: { icon: UserPlus, className: 'bg-warning text-white' },
   CONTRIBUTOR_RESPONDED: { icon: UserCheck, className: 'bg-success text-white' },
+  ACCOUNT_VERIFIED: { icon: BadgeCheck, className: 'bg-success text-white' },
 };
 
 export function NotificationItem({

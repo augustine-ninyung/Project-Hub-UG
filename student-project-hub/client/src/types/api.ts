@@ -9,7 +9,8 @@ export type NotificationType =
   | 'PROJECT_COMMENTED'
   | 'COMMENT_REPLIED'
   | 'CONTRIBUTOR_INVITED'
-  | 'CONTRIBUTOR_RESPONDED';
+  | 'CONTRIBUTOR_RESPONDED'
+  | 'ACCOUNT_VERIFIED';
 export type ReportReason =
   | 'SPAM'
   | 'HARASSMENT'

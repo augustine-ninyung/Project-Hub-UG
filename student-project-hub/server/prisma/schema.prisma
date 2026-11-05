@@ -54,6 +54,7 @@ enum NotificationType {
   COMMENT_REPLIED
   CONTRIBUTOR_INVITED
   CONTRIBUTOR_RESPONDED
+  ACCOUNT_VERIFIED
 }
 
 enum ReportTargetType {

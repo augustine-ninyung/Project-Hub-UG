@@ -4,6 +4,7 @@ import type { AuthUser } from '../../types/express.js';
 import { ApiError } from '../../utils/api-error.js';
 import { slugify } from '../../utils/common-schemas.js';
 import { deleteComment } from '../engagement/engagement.service.js';
+import { notify } from '../notifications/notification.service.js';
 import { deleteProject } from '../projects/project.service.js';
 import { userSummarySelect } from '../users/user.select.js';
 import type { AdminProjectsQuery, AdminReportsQuery, AdminUsersQuery } from './admin.schemas.js';
@@ -163,6 +164,9 @@ export async function listUsers(query: AdminUsersQuery) {
   const where: Prisma.UserWhereInput = {
     ...(query.role ? { role: query.role } : {}),
     ...(query.status ? { status: query.status } : {}),
+    ...(query.verified !== undefined
+      ? { emailVerifiedAt: query.verified ? { not: null } : null }
+      : {}),
     ...(query.search
       ? {
           OR: [
@@ -214,6 +218,42 @@ export async function updateUser(
     });
   }
   return user;
+}
+
+/**
+ * Marks a user's email as verified on an admin's say-so, for students whose
+ * verification email never arrived. One-way: there is no un-verify.
+ */
+export async function verifyUserEmail(id: string, admin: AuthUser) {
+  return prisma.$transaction(async (tx) => {
+    const now = new Date();
+    // Conditional update so two admins clicking at once can't both "verify".
+    const { count } = await tx.user.updateMany({
+      where: { id, emailVerifiedAt: null },
+      data: { emailVerifiedAt: now },
+    });
+    if (count === 0) {
+      const exists = await tx.user.count({ where: { id } });
+      throw exists
+        ? ApiError.conflict('This email is already verified')
+        : ApiError.notFound('User not found');
+    }
+    // Any verification links still in their inbox are no longer needed.
+    await tx.authToken.updateMany({
+      where: { userId: id, type: 'EMAIL_VERIFICATION', usedAt: null },
+      data: { usedAt: now },
+    });
+    await notify(tx, {
+      type: 'ACCOUNT_VERIFIED',
+      recipientId: id,
+      actorId: admin.id,
+      message: 'verified your account. You can now upload projects and comment.',
+    });
+    return tx.user.findUniqueOrThrow({
+      where: { id },
+      select: { ...userSummarySelect, email: true, emailVerifiedAt: true },
+    });
+  });
 }
 
 export async function listProjects(query: AdminProjectsQuery) {
