@@ -36,6 +36,12 @@ describe('link previews', () => {
     expect(res.text).toContain('summary_large_image');
   });
 
+  it('does not repeat the site name when the title already has it', async () => {
+    const { body } = await createProject('ProjectHub — Student Showcase');
+    const res = await client().get(`/projects/${body.data.id}`).expect(200);
+    expect(res.text).toContain('<meta property="og:title" content="ProjectHub — Student Showcase" />');
+  });
+
   it('escapes user content in the tags', async () => {
     const { body } = await createProject('"><script>alert(1)</script>');
     const res = await client().get(`/projects/${body.data.id}`).expect(200);

@@ -113,7 +113,7 @@ shareRouter.get('/projects/:id', async (req: Request, res: Response) => {
 
   const meta: Meta = project
     ? {
-        title: `${project.title} — ProjectHub`,
+        title: /projecthub/i.test(project.title) ? project.title : `${project.title} — ProjectHub`,
         description: summarize(
           `${project.category.name} project by ${project.owner.fullName} (${project.owner.university}). ${project.description}`,
         ),
