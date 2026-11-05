@@ -74,7 +74,6 @@ student-project-hub/
 ├── vercel.json               # Vercel build settings and routing
 ├── api/index.js              # Vercel Function that runs the Express API
 ├── scripts/vercel-build.js   # Vercel build: migrations (production) + builds
-├── tsconfig.json             # empty on purpose (stops Vercel type-checking the client)
 ├── server/
 │   ├── prisma.config.ts      # Prisma 7 config: schema, migrations, seed, DATABASE_URL
 │   ├── prisma/
