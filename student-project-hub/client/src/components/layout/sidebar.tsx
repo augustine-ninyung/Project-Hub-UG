@@ -47,7 +47,8 @@ export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
                 className={({ isActive }) =>
                   cn(
                     'group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground',
-                    isActive && 'bg-accent text-foreground',
+                    isActive &&
+                      'bg-accent text-foreground before:absolute before:inset-y-1.5 before:-left-3 before:w-0.5 before:rounded-full before:bg-brand',
                     collapsed && 'justify-center px-0',
                   )
                 }
@@ -78,7 +79,7 @@ export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
 
         {!collapsed && categories && categories.length > 0 && (
           <div>
-            <h2 className="px-2.5 pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <h2 className="px-2.5 pb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               Categories
             </h2>
             <ul className="space-y-0.5">

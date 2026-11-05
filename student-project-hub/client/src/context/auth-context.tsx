@@ -74,10 +74,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await authService.logout();
-    } finally {
-      queryClient.clear();
-      setUser(null);
+    } catch {
+      // Sign out locally regardless; the server session expires on its own.
     }
+    // Update the auth entry in place: clear() would remove it from the cache
+    // and detach the observer above, leaving the old user on screen.
+    await queryClient.cancelQueries();
+    setUser(null);
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' });
   }, [queryClient, setUser]);
 
   const value = useMemo<AuthContextValue>(

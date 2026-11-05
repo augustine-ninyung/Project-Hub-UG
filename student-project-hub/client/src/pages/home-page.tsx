@@ -1,4 +1,4 @@
-import { Plus, Sparkles, UserPlus } from 'lucide-react';
+import { Moon, Plus, Sparkles, Sun, Sunrise, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Section } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,9 @@ import { ActiveStudents } from '@/features/users/active-students';
 
 function greeting() {
   const h = new Date().getHours();
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  if (h < 12) return { text: 'Good morning', Icon: Sunrise };
+  if (h < 18) return { text: 'Good afternoon', Icon: Sun };
+  return { text: 'Good evening', Icon: Moon };
 }
 
 function Welcome() {
@@ -26,13 +28,17 @@ function Welcome() {
 
   // Signed-out visitors get the landing page at "/" instead of this dashboard.
   if (!user) return null;
+  const { text, Icon } = greeting();
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-sm text-muted-foreground">{greeting()},</p>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {user.fullName.split(' ')[0]} 👋
+        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Icon className="size-4 text-brand" aria-hidden />
+          {text},
+        </p>
+        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">
+          {user.fullName.split(' ')[0]}
         </h1>
         <p className="mt-1 text-muted-foreground">
           See what the community has been building this week.

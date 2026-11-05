@@ -12,19 +12,24 @@ export function AuthLayout() {
           </div>
         </div>
       </div>
-      <aside className="relative hidden overflow-hidden border-l bg-muted/40 lg:flex lg:flex-col lg:justify-end lg:p-12">
+      <aside className="relative isolate hidden overflow-hidden bg-ink text-[#FAF9F5] lg:flex lg:flex-col lg:justify-end lg:p-12">
         <div
           aria-hidden
-          className="absolute inset-0 [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:22px_22px]"
+          className="absolute inset-0 -z-10 opacity-[0.1] [background-image:radial-gradient(#FAF9F5_1px,transparent_1px)] [background-size:22px_22px]"
+        />
+        <div
+          aria-hidden
+          className="absolute -right-32 -top-32 -z-10 size-[28rem] rounded-full bg-brand/30 blur-3xl"
         />
         <div className="relative max-w-md space-y-4">
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">
+          <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-brand">
+            <span aria-hidden className="h-px w-6 bg-brand" />
             Built by students, for students
           </p>
-          <h2 className="text-3xl font-semibold leading-tight tracking-tight">
-            Show what you've built. Find people to build with.
+          <h2 className="font-display text-4xl font-medium leading-[1.1] tracking-tight">
+            Show what you've built. <em className="font-normal italic text-brand">Find people to build with.</em>
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-[#FAF9F5]/70">
             Share your projects, get feedback from peers across universities, and discover
             collaborators for your next idea.
           </p>

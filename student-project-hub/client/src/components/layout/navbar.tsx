@@ -64,8 +64,8 @@ export function Navbar({ onOpenMenu }: { onOpenMenu: () => void }) {
 
   const handleLogout = async () => {
     await logout();
+    navigate('/', { replace: true });
     toast.success('Signed out');
-    navigate('/');
   };
 
   return (

@@ -6,6 +6,7 @@ import {
   Moon,
   Search,
   ShieldCheck,
+  Sparkles,
   Sun,
   Upload,
   UserRound,
@@ -62,7 +63,10 @@ const container = 'mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8';
 
 function Eyebrow({ children }: { children: string }) {
   return (
-    <p className="font-mono text-xs font-medium uppercase tracking-widest text-primary">{children}</p>
+    <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-primary">
+      <span aria-hidden className="h-px w-6 bg-brand" />
+      {children}
+    </p>
   );
 }
 
@@ -80,7 +84,9 @@ function SectionHeading({
   return (
     <div className={cn('max-w-2xl space-y-3', className)}>
       <Eyebrow>{eyebrow}</Eyebrow>
-      <h2 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{title}</h2>
+      <h2 className="font-display text-3xl font-medium tracking-tight text-balance sm:text-[2.6rem] sm:leading-[1.1]">
+        {title}
+      </h2>
       {description && <p className="text-lg text-muted-foreground text-pretty">{description}</p>}
     </div>
   );
@@ -151,7 +157,7 @@ function Hero() {
       />
       <div
         aria-hidden
-        className="absolute left-1/2 top-0 -z-10 h-[480px] w-[min(1100px,100%)] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl dark:bg-primary/10"
+        className="absolute left-1/2 top-0 -z-10 h-[480px] w-[min(1100px,100%)] -translate-x-1/2 rounded-full bg-brand/15 blur-3xl dark:bg-brand/10"
       />
 
       <div
@@ -165,8 +171,8 @@ function Hero() {
             to="/explore?sort=newest"
             className="group inline-flex items-center gap-2 rounded-full border bg-card/70 py-1 pl-1 pr-3 text-sm shadow-xs backdrop-blur transition-colors hover:border-primary/50"
           >
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-              New
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <Sparkles className="size-3" aria-hidden /> New
             </span>
             <span className="text-muted-foreground group-hover:text-foreground">
               See what students shipped this week
@@ -174,12 +180,8 @@ function Hero() {
             <ArrowRight className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
 
-          <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight text-balance sm:text-5xl lg:text-6xl">
-            Where student projects{' '}
-            <span className="bg-gradient-to-r from-primary to-[oklch(0.6_0.12_220)] bg-clip-text text-transparent">
-              get seen
-            </span>
-            .
+          <h1 className="text-[2.75rem] font-medium leading-[1.04] tracking-[-0.02em] text-balance sm:text-6xl lg:text-[4.25rem]">
+            Where student projects <em className="font-normal italic text-primary">get seen</em>.
           </h1>
           <p className="max-w-xl text-lg text-muted-foreground text-pretty">
             ProjectHub is the community where students showcase websites, apps, AI models,
@@ -188,12 +190,12 @@ function Hero() {
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button asChild size="lg" className="h-11 px-6 text-[15px] shadow-sm shadow-primary/20">
+            <Button asChild size="lg" className="h-11 rounded-lg px-6 text-[15px] shadow-sm shadow-primary/20">
               <Link to="/register">
                 Share your project <ArrowRight />
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="h-11 px-6 text-[15px]">
+            <Button asChild size="lg" variant="outline" className="h-11 rounded-lg px-6 text-[15px]">
               <Link to="/explore">
                 <Search /> Explore projects
               </Link>
@@ -231,7 +233,7 @@ function StatsRow() {
       {stats.map((s) => (
         <div key={s.label} className="space-y-1">
           <dt className="text-xs text-muted-foreground">{s.label}</dt>
-          <dd className="text-2xl font-semibold tabular-nums tracking-tight">
+          <dd className="font-display text-3xl font-medium tabular-nums tracking-tight">
             {isLoading || s.value === undefined ? (
               <Skeleton className="h-7 w-12" />
             ) : (
@@ -407,10 +409,10 @@ function Features() {
         <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <div key={f.title} className="group space-y-3 bg-card p-6 transition-colors hover:bg-muted/40 sm:p-8">
-              <span className="flex size-10 items-center justify-center rounded-lg border bg-background text-primary shadow-xs transition-colors group-hover:border-primary/40">
+              <span className="flex size-10 items-center justify-center rounded-lg bg-brand/12 text-primary ring-1 ring-brand/20 transition-colors group-hover:bg-brand/20">
                 <f.icon className="size-5" aria-hidden />
               </span>
-              <h3 className="font-semibold tracking-tight">{f.title}</h3>
+              <h3 className="font-display text-lg font-medium tracking-tight">{f.title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">{f.description}</p>
             </div>
           ))}
@@ -450,11 +452,11 @@ function HowItWorks() {
           <span aria-hidden className="absolute bottom-6 left-5 top-6 w-px bg-border" />
           {STEPS.map((step, i) => (
             <li key={step.title} className="relative flex gap-5">
-              <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full border bg-background font-mono text-sm font-semibold text-primary shadow-xs">
+              <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full border bg-background font-display text-lg font-medium text-primary shadow-xs">
                 {i + 1}
               </span>
               <div className="space-y-1 pt-1.5">
-                <h3 className="font-semibold tracking-tight">{step.title}</h3>
+                <h3 className="font-display text-lg font-medium tracking-tight">{step.title}</h3>
                 <p className="text-muted-foreground">{step.description}</p>
               </div>
             </li>
@@ -520,22 +522,26 @@ function FinalCta() {
   return (
     <section className="pb-20 sm:pb-28">
       <div className={container}>
-        <div className="relative isolate overflow-hidden rounded-3xl bg-primary px-6 py-14 text-center text-primary-foreground sm:px-12 sm:py-20">
+        <div className="relative isolate overflow-hidden rounded-3xl bg-ink px-6 py-14 text-center text-[#FAF9F5] ring-1 ring-white/5 sm:px-12 sm:py-20">
           <div
             aria-hidden
-            className="absolute inset-0 -z-10 opacity-25 [background-image:radial-gradient(currentColor_1px,transparent_1px)] [background-size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+            className="absolute inset-0 -z-10 opacity-[0.12] [background-image:radial-gradient(currentColor_1px,transparent_1px)] [background-size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
           />
-          <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            Your next project deserves an audience.
+          <div
+            aria-hidden
+            className="absolute -bottom-40 left-1/2 -z-10 h-80 w-[min(720px,100%)] -translate-x-1/2 rounded-full bg-brand/35 blur-3xl"
+          />
+          <h2 className="font-display mx-auto max-w-2xl text-3xl font-medium tracking-tight text-balance sm:text-[2.75rem] sm:leading-[1.1]">
+            Your next project deserves <em className="font-normal italic text-brand">an audience</em>.
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg opacity-85 text-pretty">
+          <p className="mx-auto mt-4 max-w-xl text-lg text-[#FAF9F5]/75 text-pretty">
             Join students sharing their work, trading feedback and finding teammates.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <Button
               asChild
               size="lg"
-              className="h-11 bg-primary-foreground px-6 text-[15px] text-primary hover:bg-primary-foreground/90"
+              className="h-11 rounded-lg bg-brand px-6 text-[15px] text-[#141413] hover:bg-brand/90"
             >
               <Link to="/register">
                 Create your free account <ArrowRight />
@@ -545,7 +551,7 @@ function FinalCta() {
               asChild
               size="lg"
               variant="ghost"
-              className="h-11 px-6 text-[15px] text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+              className="h-11 rounded-lg px-6 text-[15px] text-[#FAF9F5] hover:bg-white/10 hover:text-[#FAF9F5]"
             >
               <Link to="/explore">Explore first</Link>
             </Button>

@@ -22,7 +22,7 @@ async function send(mail: Mail) {
   if (!transporter) {
     // No SMTP configured: print the email so links can be used in development.
     if (!isTest) {
-      console.log(`\n📧 Email to ${mail.to}\n   Subject: ${mail.subject}\n   ${mail.text}\n`);
+      console.log(`\n[email] To: ${mail.to}\n   Subject: ${mail.subject}\n   ${mail.text}\n`);
     }
     return;
   }
@@ -34,12 +34,16 @@ async function send(mail: Mail) {
   }
 }
 
+// Email clients need inline styles; colours match the site's clay-on-ivory theme.
 function layout(heading: string, body: string, ctaLabel: string, ctaUrl: string) {
-  return `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:auto;padding:24px;color:#18181b">
-  <h2 style="margin:0 0 16px">${heading}</h2>
-  <p style="line-height:1.6">${body}</p>
-  <p style="margin:24px 0"><a href="${ctaUrl}" style="background:#0f766e;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">${ctaLabel}</a></p>
-  <p style="font-size:12px;color:#71717a">If the button does not work, copy this link:<br>${ctaUrl}</p>
+  return `<div style="background:#FAF9F5;padding:32px 16px">
+<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:480px;margin:auto;padding:32px;background:#FFFFFF;border:1px solid #E8E6DC;border-radius:12px;color:#141413">
+  <p style="margin:0 0 24px;font-family:Georgia,serif;font-size:20px;font-weight:600">ProjectHub</p>
+  <h2 style="margin:0 0 16px;font-family:Georgia,serif;font-weight:500;font-size:24px">${heading}</h2>
+  <p style="line-height:1.6;margin:0">${body}</p>
+  <p style="margin:28px 0"><a href="${ctaUrl}" style="background:#B5562F;color:#FFFFFF;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">${ctaLabel}</a></p>
+  <p style="font-size:12px;color:#6B6A64;margin:0">If the button does not work, copy this link:<br>${ctaUrl}</p>
+</div>
 </div>`;
 }
 
