@@ -20,3 +20,5 @@ server/.pgdata-test/
 .idea/
 .DS_Store
 Thumbs.db
+
+.vercel
