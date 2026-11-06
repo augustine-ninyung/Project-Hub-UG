@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { cronRouter } from './modules/cron/cron.routes.js';
 import { commentRouter } from './modules/engagement/engagement.routes.js';
 import { metaRouter } from './modules/meta/meta.routes.js';
 import { notificationRouter } from './modules/notifications/notification.routes.js';
@@ -17,4 +18,5 @@ apiRouter.use('/comments', commentRouter);
 apiRouter.use('/notifications', notificationRouter);
 apiRouter.use('/reports', reportRouter);
 apiRouter.use('/admin', adminRouter);
+apiRouter.use('/cron', cronRouter);
 apiRouter.use('/', metaRouter);

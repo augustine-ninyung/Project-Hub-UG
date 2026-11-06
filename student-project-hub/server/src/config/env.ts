@@ -50,6 +50,11 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   EMAIL_FROM: z.string().default('Student Project Hub <no-reply@example.com>'),
+
+  /** Shared with Vercel Cron; scheduled jobs (keep-alive, backups) are off without it. */
+  CRON_SECRET: z.preprocess(emptyToUndefined, z.string().min(16).optional()),
+  /** Where backups go when Supabase isn't configured (development, tests). */
+  BACKUP_LOCAL_DIR: z.string().default('.backups'),
 });
 
 // On Vercel the client and API share one origin, so the deployment's own URL

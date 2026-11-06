@@ -21,6 +21,7 @@ export default defineConfig({
       SUPABASE_SERVICE_ROLE_KEY: '',
       SMTP_HOST: '',
       LOCAL_UPLOAD_DIR: '.uploads-test',
+      BACKUP_LOCAL_DIR: '.backups-test',
     },
   },
 });
