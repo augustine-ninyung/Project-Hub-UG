@@ -268,29 +268,40 @@ export async function verifyUserEmail(id: string, admin: AuthUser) {
 }
 
 /** Admins act only on accounts whose owner asked for deletion. */
-async function findDeletionRequest(id: string, admin: AuthUser) {
+async function findManagedAccount(id: string, admin: AuthUser) {
   if (id === admin.id) throw ApiError.badRequest('You cannot act on your own account here');
   const user = await prisma.user.findUnique({
     where: { id },
     select: {
+      status: true,
       deletionRequestedAt: true,
       avatarPath: true,
       projects: { select: { id: true, coverImagePath: true, images: { select: { path: true } } } },
     },
   });
   if (!user) throw ApiError.notFound('User not found');
-  if (!user.deletionRequestedAt) {
-    throw ApiError.conflict('This student has not asked for their account to be deleted');
+  return user;
+}
+
+/**
+ * An account can be deleted for good only if its owner asked, or an admin has
+ * already suspended it. Active accounts that didn't ask can never be deleted
+ * in one step.
+ */
+async function findDeletableAccount(id: string, admin: AuthUser) {
+  const user = await findManagedAccount(id, admin);
+  if (!user.deletionRequestedAt && user.status !== 'SUSPENDED') {
+    throw ApiError.conflict('Suspend this account first, or wait for the student to ask for deletion');
   }
   return user;
 }
 
 /**
- * Permanently deletes an account its owner asked to delete: their projects,
- * comments, likes, notifications and uploaded images go with it.
+ * Permanently deletes an account (requested by its owner, or suspended): their
+ * projects, comments, likes, notifications and uploaded images go with it.
  */
 export async function deleteRequestedAccount(id: string, admin: AuthUser) {
-  const user = await findDeletionRequest(id, admin);
+  const user = await findDeletableAccount(id, admin);
   await prisma.user.delete({ where: { id } }); // cascades in the database
   for (const p of user.projects) queueTopic(projectTopic(p.id));
   queueTopic(FEED_TOPIC);
@@ -303,7 +314,10 @@ export async function deleteRequestedAccount(id: string, admin: AuthUser) {
 
 /** Turns down a deletion request: the account works again. */
 export async function keepRequestedAccount(id: string, admin: AuthUser) {
-  await findDeletionRequest(id, admin);
+  const user = await findManagedAccount(id, admin);
+  if (!user.deletionRequestedAt) {
+    throw ApiError.conflict('This student has not asked for their account to be deleted');
+  }
   return prisma.user.update({
     where: { id },
     data: { deletionRequestedAt: null, deletionReason: null },

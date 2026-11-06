@@ -100,3 +100,27 @@ describe('account deletion requests', () => {
     expect(await prisma.user.count({ where: { id: user.id } })).toBe(1);
   });
 });
+
+describe('deleting suspended accounts', () => {
+  it('lets an admin delete an account after suspending it, without a request', async () => {
+    const { user, projectId } = await studentWithProject();
+    const admin = await signUp({ role: 'ADMIN' });
+
+    // Active and never asked: refused.
+    expect((await admin.agent.delete(`/api/v1/admin/users/${user.id}`)).status).toBe(409);
+
+    await admin.agent.patch(`/api/v1/admin/users/${user.id}`).send({ status: 'SUSPENDED' }).expect(200);
+    const res = await admin.agent.delete(`/api/v1/admin/users/${user.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.projectsRemoved).toBe(1);
+    expect(await prisma.user.count({ where: { id: user.id } })).toBe(0);
+    expect(await prisma.project.count({ where: { id: projectId } })).toBe(0);
+  });
+
+  it('keeps "keep account" for real requests only', async () => {
+    const { user } = await signUp();
+    const admin = await signUp({ role: 'ADMIN' });
+    await admin.agent.patch(`/api/v1/admin/users/${user.id}`).send({ status: 'SUSPENDED' }).expect(200);
+    expect((await admin.agent.post(`/api/v1/admin/users/${user.id}/keep`)).status).toBe(409);
+  });
+});

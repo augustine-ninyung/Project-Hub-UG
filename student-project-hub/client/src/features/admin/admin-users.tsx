@@ -99,7 +99,7 @@ function DeleteAccountConfirm({
       <DialogContent className="max-w-md">
         <DialogHeader
           title={`Permanently delete @${user?.username}?`}
-          description={`${user?.fullName} asked for this. Their account, ${plural(user?._count.projects ?? 0, 'project')}, comments, likes and images are deleted for good. Replies other students left under their comments go too. This cannot be undone.`}
+          description={`${user?.deletionRequestedAt ? `${user.fullName} asked for this.` : 'This account is suspended.'} Their account, ${plural(user?._count.projects ?? 0, 'project')}, comments, likes and images are deleted for good. Replies other students left under their comments go too. This cannot be undone.`}
         />
         <form
           className="space-y-4"
@@ -254,9 +254,17 @@ function RowActions({
               <Ban /> Suspend
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onSelect={() => actions.update.mutate({ id: user.id, data: { status: 'ACTIVE' } })}>
-              <Check /> Reactivate
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem onSelect={() => actions.update.mutate({ id: user.id, data: { status: 'ACTIVE' } })}>
+                <Check /> Reactivate
+              </DropdownMenuItem>
+              {/* Suspended accounts can be deleted for good, even without a request. */}
+              {!user.deletionRequestedAt && (
+                <DropdownMenuItem destructive onSelect={() => onDelete(user)}>
+                  <Trash2 /> Delete account
+                </DropdownMenuItem>
+              )}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -438,6 +446,11 @@ function UserPanel({
                       </Button>
                     )}
                   </div>
+                  {user.status === 'SUSPENDED' && (
+                    <Button variant="destructive" className="w-full" onClick={() => onDelete(user)}>
+                      <Trash2 /> Delete account permanently
+                    </Button>
+                  )}
                 </>
               )}
               <Button variant="ghost" className="w-full" asChild>

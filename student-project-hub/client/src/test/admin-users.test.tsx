@@ -135,3 +135,28 @@ describe('Admin deletion requests', () => {
     expect(adminService.deleteAccount).toHaveBeenCalledWith('kwesi');
   });
 });
+
+describe('Deleting suspended accounts', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('offers permanent deletion for suspended students only', async () => {
+    serve([person('susp', { status: 'SUSPENDED' }), person('act', { emailVerifiedAt: new Date().toISOString() })]);
+    vi.mocked(adminService.deleteAccount).mockResolvedValue(undefined);
+    renderWithProviders(<AdminUsers />, { user: admin });
+
+    await userEvent.click(await screen.findByRole('button', { name: /Student act/ }));
+    let panel = await screen.findByRole('dialog');
+    expect(within(panel).queryByRole('button', { name: /Delete account permanently/ })).not.toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: /Student susp/ }));
+    panel = await screen.findByRole('dialog');
+    await userEvent.click(within(panel).getByRole('button', { name: /Delete account permanently/ }));
+
+    const confirm = await screen.findByRole('dialog', { name: /Permanently delete @susp/ });
+    expect(within(confirm).getByText(/This account is suspended/)).toBeInTheDocument();
+    await userEvent.type(within(confirm).getByLabelText(/Type susp to confirm/), 'susp');
+    await userEvent.click(within(confirm).getByRole('button', { name: /Delete permanently/ }));
+    expect(adminService.deleteAccount).toHaveBeenCalledWith('susp');
+  });
+});

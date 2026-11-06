@@ -217,21 +217,21 @@ npm test -w client    # component tests
 npm run typecheck     # TypeScript, both apps
 ```
 
-**Server (73 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
+**Server (75 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
 
 | File | Covers |
 |---|---|
 | `auth.test.ts` | registration, hashing, duplicates, login by email/username, generic errors, suspended accounts, refresh-token rotation and replay, logout, CSRF, email verification, password reset |
 | `projects.test.ts` | create with images, auth and verified-email rules, validation, fake-image rejection, contributor invites, private-project access, owner/admin-only edit and delete, search/filter/sort/pagination, trending and featured |
 | `engagement.test.ts` | idempotent likes and counts, notifications, clearing only your own notifications, threaded comments, author-only edit, soft delete, reports |
-| `account-deletion.test.ts` | deletion requests need the password, end every session and hide the profile; sign-in reports the pending request only after a correct password and can withdraw it; admins delete for good (with projects) or keep the account; never for accounts that didn't ask; admin-only |
+| `account-deletion.test.ts` | deletion requests need the password, end every session and hide the profile; sign-in reports the pending request only after a correct password and can withdraw it; admins delete for good (with projects) or keep the account; suspended accounts can be deleted without a request, active ones that didn't ask never; admin-only |
 | `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, manual email verification (admin-only, one-time, unlocks posting at once, notifies the student), unverified count |
 | `meta.test.ts` | public stats count only public projects and active students |
 | `rate-limit-store.test.ts` | database-backed rate-limit counters: windows, sharing across instances, concurrency |
 | `realtime.test.ts` | live-update pings for likes, replies and project changes; nothing sent for failed requests; unguessable user topics; the admin topic (admins only; pinged on sign-ups, reports and admin actions) |
 | `share.test.ts` | link-preview tags for public projects, HTML escaping, private projects never described, 1200×630 preview image, fallback image |
 
-**Client (27 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, the live-update hook (subscribe, debounce, disabled when not configured), and the admin Students tab (instant verify with rollback, confirmation before granting admin, bulk verify, details panel, typing the username before permanent deletion), and keeping an account that is waiting to be deleted at sign-in.
+**Client (28 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, the live-update hook (subscribe, debounce, disabled when not configured), and the admin Students tab (instant verify with rollback, confirmation before granting admin, bulk verify, details panel, typing the username before permanent deletion, deleting suspended accounts), and keeping an account that is waiting to be deleted at sign-in.
 
 ---
 
@@ -266,7 +266,7 @@ Base path: `/api/v1`. 🔒 session required · ✉️ verified email required ·
 `GET /categories` · `GET /technologies?search=` · `GET /stats` (public totals for the landing page) · `GET /realtime` (live-update settings for the browser, or `null` when off)
 
 **Admin** 🛡️:
-`GET /admin/statistics` · `GET /admin/activity` · `GET /admin/users?search=&role=&status=&verified=&deletion=requested` · `PATCH /admin/users/:id` (`{ role?, status? }`) · `POST /admin/users/:id/verify-email` · `DELETE /admin/users/:id` (only after the owner asked) · `POST /admin/users/:id/keep` · `GET /admin/projects` · `PATCH /admin/projects/:id/feature` · `DELETE /admin/projects/:id` · `GET /admin/reports?status=` · `PATCH /admin/reports/:id` (`{ status, resolutionNote?, removeContent? }`) · `POST/PATCH/DELETE /admin/categories[/:id]`
+`GET /admin/statistics` · `GET /admin/activity` · `GET /admin/users?search=&role=&status=&verified=&deletion=requested` · `PATCH /admin/users/:id` (`{ role?, status? }`) · `POST /admin/users/:id/verify-email` · `DELETE /admin/users/:id` (only if the owner asked or the account is suspended) · `POST /admin/users/:id/keep` · `GET /admin/projects` · `PATCH /admin/projects/:id/feature` · `DELETE /admin/projects/:id` · `GET /admin/reports?status=` · `PATCH /admin/reports/:id` (`{ status, resolutionNote?, removeContent? }`) · `POST/PATCH/DELETE /admin/categories[/:id]`
 
 **Outside `/api/v1`:**
 `GET /health` · `GET /projects/:id` (link-preview HTML, only for social crawlers on Vercel) · `GET /og/projects/:id.jpg` (1200×630 preview image)
@@ -366,7 +366,7 @@ Day-to-day management happens in the **Admin** dashboard; no SQL needed. It upda
 - **Verify an email by hand** (needed while emails only reach your own address): the overview links straight to unverified students. Click **Verify** on a row, or tick several and use **Verify selected**. They can upload and comment straight away, without signing out, and get a notification saying so. Verification can't be undone; use **Suspend** for bad actors.
 - **See everything about a student:** click their row to open a side panel with their details, stats, projects and actions.
 - **Make someone an admin, remove admin access, or suspend an account** from the row's **⋯** menu or the side panel. These ask for confirmation first; reactivating doesn't.
-- **Account deletion requests.** Students ask in **Settings → Delete account**, confirming with their password (an optional reason is shown to admins). They are signed out everywhere and hidden at once. Requests show as a red badge on **Students** and on the overview. Open one and choose **Keep account** (it works again) or **Delete**, then type the username to confirm. Deleting removes the account, its projects, comments, likes and uploaded images for good, including other students' replies under their comments. If the student signs in before you decide, they can choose **Keep my account**, which withdraws the request. Admins can only delete accounts whose owner asked.
+- **Account deletion requests.** Students ask in **Settings → Delete account**, confirming with their password (an optional reason is shown to admins). They are signed out everywhere and hidden at once. Requests show as a red badge on **Students** and on the overview. Open one and choose **Keep account** (it works again) or **Delete**, then type the username to confirm. Deleting removes the account, its projects, comments, likes and uploaded images for good, including other students' replies under their comments. If the student signs in before you decide, they can choose **Keep my account**, which withdraws the request. Admins can delete an account only if its owner asked or it is suspended: to remove an account that misbehaves, **Suspend** it first, then **Delete** appears.
 - Actions show on screen immediately and roll back with an error message if the server refuses.
 
 SQL (in **Supabase → SQL Editor**, keeping the double quotes around names) is only needed if no admin can sign in, for example to create the very first admin:
