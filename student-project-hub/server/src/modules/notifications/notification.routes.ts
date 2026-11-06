@@ -35,6 +35,10 @@ notificationRouter.get('/unread-count', async (req: Request, res: Response) => {
   sendSuccess(res, { count: await notificationService.unreadCount(req.user!.id) });
 });
 
+notificationRouter.delete('/', async (req: Request, res: Response) => {
+  sendSuccess(res, { deleted: await notificationService.clearAll(req.user!.id) });
+});
+
 // Must be registered before /:id/read so "read-all" is not parsed as an id.
 notificationRouter.patch('/read-all', async (req: Request, res: Response) => {
   sendSuccess(res, { updated: await notificationService.markAllRead(req.user!.id) });

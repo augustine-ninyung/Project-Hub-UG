@@ -52,6 +52,7 @@ export const notificationService = {
     request<{ count: number }>({ url: '/notifications/unread-count' }).then((d) => d.count),
   markRead: (id: string) => request({ method: 'PATCH', url: `/notifications/${id}/read` }),
   markAllRead: () => request({ method: 'PATCH', url: '/notifications/read-all' }),
+  clearAll: () => request<{ deleted: number }>({ method: 'DELETE', url: '/notifications' }),
 };
 
 export const reportService = {

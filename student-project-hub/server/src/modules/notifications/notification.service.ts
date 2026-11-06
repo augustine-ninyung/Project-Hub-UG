@@ -74,3 +74,11 @@ export async function markAllRead(userId: string) {
   });
   return count;
 }
+
+/** Deletes all of a user's notifications. Pending invitations stay answerable from the home page. */
+export async function clearAll(userId: string) {
+  const { count } = await prisma.notification.deleteMany({ where: { recipientId: userId } });
+  // Lets the user's other open tabs refresh their bell.
+  if (count > 0) queueTopic(userTopic(userId));
+  return count;
+}

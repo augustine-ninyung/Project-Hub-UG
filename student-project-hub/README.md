@@ -213,13 +213,13 @@ npm test -w client    # component tests
 npm run typecheck     # TypeScript, both apps
 ```
 
-**Server (64 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
+**Server (66 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
 
 | File | Covers |
 |---|---|
 | `auth.test.ts` | registration, hashing, duplicates, login by email/username, generic errors, suspended accounts, refresh-token rotation and replay, logout, CSRF, email verification, password reset |
 | `projects.test.ts` | create with images, auth and verified-email rules, validation, fake-image rejection, contributor invites, private-project access, owner/admin-only edit and delete, search/filter/sort/pagination, trending and featured |
-| `engagement.test.ts` | idempotent likes and counts, notifications, threaded comments, author-only edit, soft delete, reports |
+| `engagement.test.ts` | idempotent likes and counts, notifications, clearing only your own notifications, threaded comments, author-only edit, soft delete, reports |
 | `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, manual email verification (admin-only, one-time, unlocks posting at once, notifies the student) |
 | `meta.test.ts` | public stats count only public projects and active students |
 | `rate-limit-store.test.ts` | database-backed rate-limit counters: windows, sharing across instances, concurrency |
@@ -252,7 +252,7 @@ Base path: `/api/v1`. 🔒 session required · ✉️ verified email required ·
 `POST /projects/:id/contributors` 🔒✉️ (owner; `{ username, role? }`) · `PATCH /projects/:id/contributors/:userId` 🔒 (invitee answers `{ status: ACCEPTED|DECLINED }`; owner can change `{ role }`) · `DELETE /projects/:id/contributors/:userId` 🔒
 
 **Notifications:**
-`GET /notifications?page=&unread=` 🔒 · `GET /notifications/unread-count` 🔒 · `PATCH /notifications/:id/read` 🔒 · `PATCH /notifications/read-all` 🔒
+`GET /notifications?page=&unread=` 🔒 · `GET /notifications/unread-count` 🔒 · `PATCH /notifications/:id/read` 🔒 · `PATCH /notifications/read-all` 🔒 · `DELETE /notifications` 🔒 (clear all of your own)
 
 **Reports:**
 `POST /reports` 🔒✉️ (`{ targetType: PROJECT|COMMENT, targetId, reason, details? }`)

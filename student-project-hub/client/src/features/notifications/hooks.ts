@@ -46,6 +46,18 @@ export function useMarkAllRead() {
   });
 }
 
+export function useClearNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: notificationService.clearAll,
+    onSuccess: () => {
+      toast.success('Notifications cleared');
+      return queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
 export function useInvitations() {
   const { isAuthenticated } = useAuth();
   return useQuery({

@@ -168,3 +168,33 @@ describe('reports', () => {
     expect((await agent.post('/api/v1/reports').send(body)).status).toBe(409);
   });
 });
+
+describe('clearing notifications', () => {
+  it('deletes only the signed-in user\'s notifications', async () => {
+    const { agent: me, user } = await signUp();
+    const { user: other } = await signUp();
+    const note = (recipientId: string, actorId: string) => ({
+      type: 'PROJECT_LIKED' as const,
+      recipientId,
+      actorId,
+      message: 'liked your project',
+    });
+    await prisma.notification.createMany({
+      data: [note(user.id, other.id), note(user.id, other.id), note(other.id, user.id)],
+    });
+
+    const res = await me.delete('/api/v1/notifications');
+    expect(res.status).toBe(200);
+    expect(res.body.data.deleted).toBe(2);
+    expect(await prisma.notification.count({ where: { recipientId: user.id } })).toBe(0);
+    expect(await prisma.notification.count({ where: { recipientId: other.id } })).toBe(1);
+
+    expect((await me.get('/api/v1/notifications/unread-count')).body.data.count).toBe(0);
+    // Clearing again is harmless.
+    expect((await me.delete('/api/v1/notifications')).body.data.deleted).toBe(0);
+  });
+
+  it('requires a session', async () => {
+    expect((await client().delete('/api/v1/notifications')).status).toBe(401);
+  });
+});
