@@ -30,6 +30,15 @@ export function userTopic(userId: string) {
   return `user:${digest.slice(0, 32)}`;
 }
 
+/**
+ * Shared topic for admin dashboards (new sign-ups, reports, moderation by
+ * other admins). Secret-derived like user topics and only given to admins.
+ */
+export function adminTopic() {
+  const digest = createHmac('sha256', env.JWT_ACCESS_SECRET).update('realtime:admin-dashboard').digest('hex');
+  return `admin:${digest.slice(0, 32)}`;
+}
+
 /** Queues a ping for the current request. Outside a request it is ignored. */
 export function queueTopic(topic: string) {
   outbox.getStore()?.add(topic);

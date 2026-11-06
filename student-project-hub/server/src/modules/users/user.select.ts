@@ -1,5 +1,5 @@
 import type { Prisma, User } from '../../generated/prisma/client.js';
-import { userTopic } from '../../services/realtime.service.js';
+import { adminTopic, userTopic } from '../../services/realtime.service.js';
 
 /** Minimal public user info embedded in projects, comments, notifications. */
 export const userSummarySelect = {
@@ -31,5 +31,7 @@ export function toSelfUser(user: User) {
     createdAt: user.createdAt,
     /** Private Realtime topic for live notification pings. */
     realtimeTopic: userTopic(user.id),
+    /** Admins only: live pings for the admin dashboard. */
+    ...(user.role === 'ADMIN' ? { adminTopic: adminTopic() } : {}),
   };
 }

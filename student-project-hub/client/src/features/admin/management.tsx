@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Check, ExternalLink, MailCheck, Pencil, Search, Shield, ShieldOff, Star, Trash2, X } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Check, ExternalLink, FolderOpen, Pencil, Star, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
@@ -9,263 +9,159 @@ import { EmptyState, ErrorState, PageLoader } from '@/components/common/states';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog';
 import { Field, Input, Select, Textarea } from '@/components/ui/form-controls';
-import { Badge, Card, UserAvatar } from '@/components/ui/misc';
-import { useAuth } from '@/context/auth-context';
+import { Badge, Card } from '@/components/ui/misc';
 import { useCategories } from '@/features/projects/hooks';
 import { getErrorMessage } from '@/services/api';
-import { adminService, type AdminReport } from '@/services/admin.service';
+import { adminService, type AdminProject, type AdminReport } from '@/services/admin.service';
 import type { Category, ReportStatus } from '@/types/api';
-import { formatDate, REPORT_REASON_LABELS, timeAgo } from '@/utils/format';
+import { REPORT_REASON_LABELS, timeAgo } from '@/utils/format';
+import { plural, SearchInput, SkeletonRows, Table, useOptimisticRows, useUrlState } from './shared';
 
-function useDebounced(value: string, delay = 300) {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return v;
-}
-
-function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
-  return (
-    <div className="relative max-w-sm flex-1">
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="pl-9" aria-label={placeholder} />
-    </div>
-  );
-}
-
-function Table({ head, children }: { head: string[]; children: ReactNode }) {
-  return (
-    <Card className="overflow-x-auto p-0">
-      <table className="w-full min-w-[640px] text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            {head.map((h) => (
-              <th key={h} className="px-4 py-2.5 font-medium">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y">{children}</tbody>
-      </table>
-    </Card>
-  );
-}
+export { AdminUsers } from './admin-users';
 
 const mutationToasts = (success: string) => ({
   onSuccess: () => toast.success(success),
   onError: (err: unknown) => toast.error(getErrorMessage(err)),
 });
 
-// ─── Users ─────────────────────────────────────────────────────────────
-
-export function AdminUsers() {
-  const { user: me } = useAuth();
-  const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [verified, setVerified] = useState('');
-  const term = useDebounced(search);
-  useEffect(() => setPage(1), [term, verified]);
-
-  const query = useQuery({
-    queryKey: ['admin', 'users', page, term, verified],
-    queryFn: () =>
-      adminService.users({ page, search: term || undefined, verified: verified ? verified === 'true' : undefined }),
-    placeholderData: keepPreviousData,
-  });
-  const update = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof adminService.updateUser>[1] }) =>
-      adminService.updateUser(id, data),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
-    ...mutationToasts('User updated'),
-  });
-  const verify = useMutation({
-    mutationFn: (id: string) => adminService.verifyEmail(id),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin'] }),
-    ...mutationToasts('Email verified. They can now upload and comment.'),
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, username or email" />
-        <Select value={verified} onChange={(e) => setVerified(e.target.value)} className="w-44" aria-label="Verification filter">
-          <option value="">All users</option>
-          <option value="false">Unverified only</option>
-          <option value="true">Verified only</option>
-        </Select>
-      </div>
-      {query.isLoading ? (
-        <PageLoader />
-      ) : query.error ? (
-        <ErrorState error={query.error} onRetry={() => query.refetch()} />
-      ) : (
-        <>
-          <Table head={['Student', 'University', 'Activity', 'Status', 'Actions']}>
-            {query.data?.items.map((u) => (
-              <tr key={u.id}>
-                <td className="px-4 py-3">
-                  <Link to={`/u/${u.username}`} className="flex items-center gap-3">
-                    <UserAvatar user={u} size="sm" />
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{u.fullName}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{u.email}</span>
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{u.university}</td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {u._count.projects} projects · {u._count.comments} comments
-                  <br />
-                  Joined {formatDate(u.createdAt)}
-                </td>
-                <td className="space-x-1 px-4 py-3">
-                  {u.role === 'ADMIN' && <Badge>Admin</Badge>}
-                  <Badge variant={u.status === 'ACTIVE' ? 'success' : 'destructive'}>
-                    {u.status === 'ACTIVE' ? 'Active' : 'Suspended'}
-                  </Badge>
-                  {!u.emailVerifiedAt && <Badge variant="outline">Unverified</Badge>}
-                </td>
-                <td className="px-4 py-3">
-                  {u.id !== me?.id && (
-                    <div className="flex flex-wrap gap-1">
-                      {!u.emailVerifiedAt && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={verify.isPending}
-                          onClick={() => verify.mutate(u.id)}
-                          title={`Mark ${u.email} as verified`}
-                        >
-                          <MailCheck /> Verify email
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={update.isPending}
-                        onClick={() => update.mutate({ id: u.id, data: { status: u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' } })}
-                      >
-                        {u.status === 'ACTIVE' ? <><Ban /> Suspend</> : <><Check /> Reactivate</>}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={update.isPending}
-                        onClick={() => update.mutate({ id: u.id, data: { role: u.role === 'ADMIN' ? 'STUDENT' : 'ADMIN' } })}
-                      >
-                        {u.role === 'ADMIN' ? <><ShieldOff /> Revoke admin</> : <><Shield /> Make admin</>}
-                      </Button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </Table>
-          <Pagination page={page} totalPages={query.data?.meta.totalPages ?? 1} onChange={setPage} />
-        </>
-      )}
-    </div>
-  );
-}
-
 // ─── Projects ──────────────────────────────────────────────────────────
+
+const PROJECTS_KEY = ['admin', 'projects'] as const;
 
 export function AdminProjects() {
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [featured, setFeatured] = useState('');
-  const [toDelete, setToDelete] = useState<{ id: string; title: string } | null>(null);
-  const term = useDebounced(search);
-  useEffect(() => setPage(1), [term, featured]);
+  const { get, set, page } = useUrlState();
+  const q = get('q');
+  const featured = get('featured');
+  const [toDelete, setToDelete] = useState<AdminProject | null>(null);
 
   const query = useQuery({
-    queryKey: ['admin', 'projects', page, term, featured],
+    queryKey: [...PROJECTS_KEY, { page, q, featured }],
     queryFn: () =>
-      adminService.projects({ page, search: term || undefined, featured: featured ? featured === 'true' : undefined }),
+      adminService.projects({ page, search: q || undefined, featured: featured ? featured === 'true' : undefined }),
     placeholderData: keepPreviousData,
   });
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['admin'] });
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-  };
-  const feature = useMutation({
-    mutationFn: ({ id, value }: { id: string; value: boolean }) => adminService.setFeatured(id, value),
-    onSettled: invalidate,
-    ...mutationToasts('Featured projects updated'),
+  const items = query.data?.items ?? [];
+
+  const feature = useOptimisticRows<AdminProject, { id: string; value: boolean }>({
+    listKey: PROJECTS_KEY,
+    mutationFn: ({ id, value }) => adminService.setFeatured(id, value),
+    apply: (p, { id, value }) => (p.id === id ? { ...p, isFeatured: value } : p),
+    success: ({ value }) => (value ? 'Featured on the home page' : 'Removed from featured'),
   });
-  const remove = useMutation({
-    mutationFn: (id: string) => adminService.deleteProject(id),
-    onSettled: () => {
-      invalidate();
-      setToDelete(null);
-    },
-    ...mutationToasts('Project removed'),
+  const remove = useOptimisticRows<AdminProject, string>({
+    listKey: PROJECTS_KEY,
+    mutationFn: (id) => adminService.deleteProject(id),
+    apply: (p, id) => (p.id === id ? null : p),
+    success: 'Project removed',
   });
+
+  const filtersActive = Boolean(q || featured);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by title or owner" />
-        <Select value={featured} onChange={(e) => setFeatured(e.target.value)} className="w-40" aria-label="Featured filter">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchInput placeholder="Search by title or owner" />
+        <Select value={featured} onChange={(e) => set({ featured: e.target.value, page: null })} className="w-40" aria-label="Featured filter">
           <option value="">All projects</option>
           <option value="true">Featured only</option>
           <option value="false">Not featured</option>
         </Select>
+        {filtersActive && (
+          <Button variant="ghost" size="sm" onClick={() => set({ q: null, featured: null, page: null })}>
+            <X /> Clear filters
+          </Button>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+          {query.data && `${query.data.meta.total} project${query.data.meta.total === 1 ? '' : 's'}`}
+        </span>
       </div>
-      {query.isLoading ? (
-        <PageLoader />
-      ) : query.error ? (
+      {query.error ? (
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
+      ) : !query.isLoading && items.length === 0 ? (
+        <EmptyState
+          icon={FolderOpen}
+          title={filtersActive ? 'No projects match these filters' : 'No projects yet'}
+          description={filtersActive ? 'Try a different search or clear the filters.' : 'New projects will appear here live.'}
+        />
       ) : (
         <>
-          <Table head={['Project', 'Owner', 'Engagement', 'Flags', 'Actions']}>
-            {query.data?.items.map((p) => (
-              <tr key={p.id}>
-                <td className="px-4 py-3">
-                  <Link to={`/projects/${p.id}`} className="flex items-center gap-3">
-                    <span className="h-9 w-14 shrink-0 overflow-hidden rounded bg-muted">
-                      {p.coverImageUrl && <img src={p.coverImageUrl} alt="" className="size-full object-cover" loading="lazy" />}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="line-clamp-1 font-medium">{p.title}</span>
-                      <span className="text-xs text-muted-foreground">{p.category.name} · {timeAgo(p.createdAt)}</span>
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">@{p.owner.username}</td>
-                <td className="px-4 py-3 text-xs tabular-nums text-muted-foreground">
-                  {p.likeCount} likes · {p.commentCount} comments
-                </td>
-                <td className="space-x-1 px-4 py-3">
-                  {p.visibility === 'PRIVATE' && <Badge variant="secondary">Private</Badge>}
-                  {p.isFeatured && <Badge variant="warning">Featured</Badge>}
-                  {p.pendingReports > 0 && <Badge variant="destructive">{p.pendingReports} reports</Badge>}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={feature.isPending || (p.visibility === 'PRIVATE' && !p.isFeatured)}
-                      onClick={() => feature.mutate({ id: p.id, value: !p.isFeatured })}
+          <Table
+            busy={query.isFetching && query.isPlaceholderData}
+            head={['Project', 'Owner', 'Engagement', 'Flags', <span key="a" className="sr-only">Actions</span>]}
+          >
+            {query.isLoading ? (
+              <SkeletonRows cols={5} />
+            ) : (
+              items.map((p) => (
+                <tr key={p.id} className="transition-colors hover:bg-accent/40">
+                  <td className="px-4 py-3">
+                    <Link to={`/projects/${p.id}`} className="group flex items-center gap-3">
+                      <span className="h-9 w-14 shrink-0 overflow-hidden rounded bg-muted">
+                        {p.coverImageUrl && (
+                          <img
+                            src={p.coverImageUrl}
+                            alt=""
+                            className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        )}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="line-clamp-1 font-medium group-hover:underline">{p.title}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {p.category.name} · {timeAgo(p.createdAt)}
+                        </span>
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      to={`/admin/users?q=${encodeURIComponent(p.owner.username)}`}
+                      className="text-muted-foreground hover:text-foreground hover:underline"
+                      title="Find this student in the admin list"
                     >
-                      <Star className={p.isFeatured ? 'fill-current' : undefined} />
-                      {p.isFeatured ? 'Unfeature' : 'Feature'}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setToDelete(p)}>
-                      <Trash2 /> Remove
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      @{p.owner.username}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-xs tabular-nums text-muted-foreground">
+                    {plural(p.likeCount, 'like')} · {plural(p.commentCount, 'comment')}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="flex flex-wrap gap-1">
+                      {p.visibility === 'PRIVATE' && <Badge variant="secondary">Private</Badge>}
+                      {p.isFeatured && <Badge variant="warning">Featured</Badge>}
+                      {p.pendingReports > 0 && (
+                        <Link to="/admin/reports">
+                          <Badge variant="destructive">
+                            {p.pendingReports} report{p.pendingReports === 1 ? '' : 's'}
+                          </Badge>
+                        </Link>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={p.visibility === 'PRIVATE' && !p.isFeatured}
+                        title={p.visibility === 'PRIVATE' && !p.isFeatured ? 'Private projects cannot be featured' : undefined}
+                        onClick={() => feature.mutate({ id: p.id, value: !p.isFeatured })}
+                      >
+                        <Star className={p.isFeatured ? 'fill-warning text-warning' : undefined} />
+                        {p.isFeatured ? 'Unfeature' : 'Feature'}
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setToDelete(p)}>
+                        <Trash2 /> Remove
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </Table>
-          <Pagination page={page} totalPages={query.data?.meta.totalPages ?? 1} onChange={setPage} />
+          <Pagination page={page} totalPages={query.data?.meta.totalPages ?? 1} onChange={(n) => set({ page: n })} />
         </>
       )}
       <ConfirmDialog
@@ -275,8 +171,13 @@ export function AdminProjects() {
         description={`"${toDelete?.title}" and all its comments, likes and images will be permanently deleted.`}
         confirmLabel="Remove project"
         destructive
-        loading={remove.isPending}
-        onConfirm={() => toDelete && remove.mutate(toDelete.id)}
+        onConfirm={() => {
+          if (!toDelete) return;
+          remove.mutate(toDelete.id, {
+            onSettled: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+          });
+          setToDelete(null);
+        }}
       />
     </div>
   );
@@ -359,8 +260,11 @@ function ReportCard({ report }: { report: AdminReport }) {
 }
 
 export function AdminReports() {
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<ReportStatus | ''>('PENDING');
+  const { get, set, page } = useUrlState();
+  // Pending by default; 'all' in the URL shows every status.
+  const rawStatus = get('status', 'PENDING');
+  const status = (rawStatus === 'all' ? '' : rawStatus) as ReportStatus | '';
+  const setPage = (n: number) => set({ page: n });
   const query = useQuery({
     queryKey: ['admin', 'reports', page, status],
     queryFn: () => adminService.reports({ page, status: status || undefined }),
@@ -371,10 +275,9 @@ export function AdminReports() {
     <div className="space-y-4">
       <Select
         value={status}
-        onChange={(e) => {
-          setStatus(e.target.value as ReportStatus | '');
-          setPage(1);
-        }}
+        onChange={(e) =>
+          set({ status: e.target.value === 'PENDING' ? null : e.target.value || 'all', page: null })
+        }
         className="w-44"
         aria-label="Report status"
       >

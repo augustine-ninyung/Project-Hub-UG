@@ -5,6 +5,7 @@ import { requireAuth, requireVerified } from '../../middleware/auth.js';
 import { writeLimiter } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { ApiError } from '../../utils/api-error.js';
+import { adminTopic, queueTopic } from '../../services/realtime.service.js';
 import { sendSuccess } from '../../utils/response.js';
 import { findVisibleProject } from '../projects/project.access.js';
 
@@ -66,6 +67,7 @@ reportRouter.post(
       },
       select: { id: true, targetType: true, reason: true, status: true, createdAt: true },
     });
+    queueTopic(adminTopic());
     sendSuccess(res, report, 201);
   },
 );

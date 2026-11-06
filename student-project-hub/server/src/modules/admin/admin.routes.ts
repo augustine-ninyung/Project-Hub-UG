@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
+import { adminTopic, queueTopic } from '../../services/realtime.service.js';
 import { uuidParam } from '../../utils/common-schemas.js';
 import * as controller from './admin.controller.js';
 import {
@@ -17,6 +18,11 @@ export const adminRouter = Router();
 
 // Every admin route is authorised server-side by role.
 adminRouter.use(requireAuth, requireRole('ADMIN'));
+// Every successful change refreshes other admins' dashboards.
+adminRouter.use((req, _res, next) => {
+  if (req.method !== 'GET') queueTopic(adminTopic());
+  next();
+});
 
 adminRouter.get('/statistics', controller.statistics);
 adminRouter.get('/activity', controller.activity);

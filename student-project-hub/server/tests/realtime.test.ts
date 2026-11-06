@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FEED_TOPIC, projectTopic, realtime, userTopic } from '../src/services/realtime.service.js';
+import { adminTopic, FEED_TOPIC, projectTopic, realtime, userTopic } from '../src/services/realtime.service.js';
 import { createCategory, signUp } from './helpers.js';
 
 const send = vi.fn(async (_topics: string[]) => undefined);
@@ -32,6 +32,7 @@ afterEach(() => {
 describe('live update pings', () => {
   it('pings the project and the owner when someone likes it', async () => {
     const { agent } = await signUp();
+    send.mockClear(); // signing up pings admins
     await agent.post(`/api/v1/projects/${projectId}/like`).expect(200);
 
     expect(send).toHaveBeenCalledTimes(1);
@@ -85,6 +86,7 @@ describe('live update pings', () => {
 
   it('sends nothing when the request fails', async () => {
     const { agent } = await signUp();
+    send.mockClear(); // signing up pings admins
     await agent.post('/api/v1/projects/00000000-0000-4000-8000-000000000000/like').expect(404);
     expect(send).not.toHaveBeenCalled();
   });
@@ -95,5 +97,40 @@ describe('live update pings', () => {
     expect(me.body.data.user.realtimeTopic).toBe(userTopic(owner.user.id));
     expect(userTopic(owner.user.id)).not.toBe(userTopic(other.user.id));
     expect(me.body.data.user.realtimeTopic).not.toContain(owner.user.id);
+  });
+});
+
+describe('admin dashboard pings', () => {
+  it('gives the admin topic to admins only', async () => {
+    const admin = await signUp({ role: 'ADMIN' });
+    const me = await admin.agent.get('/api/v1/auth/me').expect(200);
+    expect(me.body.data.user.adminTopic).toBe(adminTopic());
+    expect(adminTopic()).toMatch(/^admin:[0-9a-f]{32}$/);
+
+    const student = await owner.agent.get('/api/v1/auth/me').expect(200);
+    expect(student.body.data.user.adminTopic).toBeUndefined();
+  });
+
+  it('pings admins on new sign-ups, reports and admin actions', async () => {
+    const student = await signUp();
+    expect(send.mock.calls.flatMap((c) => c[0])).toContain(adminTopic());
+
+    send.mockClear();
+    await student.agent
+      .post('/api/v1/reports')
+      .send({ targetType: 'PROJECT', targetId: projectId, reason: 'SPAM' })
+      .expect(201);
+    expect(send.mock.calls.flatMap((c) => c[0])).toContain(adminTopic());
+
+    const admin = await signUp({ role: 'ADMIN' });
+    send.mockClear();
+    await admin.agent.patch(`/api/v1/admin/projects/${projectId}/feature`).send({ isFeatured: true }).expect(200);
+    expect(send.mock.calls.flatMap((c) => c[0])).toContain(adminTopic());
+
+    // Reading the dashboard sends nothing; failed actions send nothing.
+    send.mockClear();
+    await admin.agent.get('/api/v1/admin/statistics').expect(200);
+    await admin.agent.patch(`/api/v1/admin/users/${admin.user.id}`).send({ role: 'STUDENT' }).expect(400);
+    expect(send).not.toHaveBeenCalled();
   });
 });

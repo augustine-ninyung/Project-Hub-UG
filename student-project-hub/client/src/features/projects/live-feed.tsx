@@ -14,6 +14,8 @@ export function LiveFeed() {
     void queryClient.invalidateQueries({ queryKey: ['profile'] });
     void queryClient.invalidateQueries({ queryKey: ['stats'] });
     void queryClient.invalidateQueries({ queryKey: ['categories'] });
+    // Admin tables and counts, if an admin has the dashboard open.
+    void queryClient.invalidateQueries({ queryKey: ['admin'] });
   });
 
   return null;

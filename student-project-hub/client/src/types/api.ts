@@ -53,6 +53,8 @@ export interface SelfUser extends UserSummary {
   createdAt: string;
   /** Private topic for live notification pings. */
   realtimeTopic?: string;
+  /** Admins only: live pings for the admin dashboard. */
+  adminTopic?: string;
 }
 
 export interface Category {

@@ -16,6 +16,7 @@ describe('admin authorization', () => {
     const res = await agent.get('/api/v1/admin/statistics');
     expect(res.status).toBe(200);
     expect(res.body.data.totals.users).toBe(1);
+    expect(res.body.data.totals.unverifiedUsers).toBe(0);
     expect(res.body.data.daily).toHaveLength(14);
   });
 });

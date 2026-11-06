@@ -48,6 +48,9 @@ ProjectHub is a community platform where students showcase what they build, disc
 **Requirements:** Node.js 20.19+ (developed on Node 24) and npm 10+. You do **not** need PostgreSQL or Docker: the repo includes an embedded PostgreSQL server for development.
 
 ```bash
+# 0. The app lives in student-project-hub/; run every command below from there.
+cd student-project-hub
+
 # 1. Install dependencies for both apps (npm workspaces).
 #    This also generates the Prisma client (server postinstall).
 npm install
@@ -182,7 +185,7 @@ The server validates its environment at startup and exits with a clear message i
 
 ## Database, migrations and seed data
 
-The data model lives in [server/prisma/schema.prisma](server/prisma/schema.prisma):
+The data model lives in [server/prisma/schema.prisma](student-project-hub/server/prisma/schema.prisma):
 
 - **User**, **UserSession** (one row per signed-in device; refresh token stored as a SHA-256 hash), **AuthToken** (hashed single-use email-verification and password-reset tokens).
 - **Project** with **Category**, **Technology** (many-to-many through **ProjectTechnology**), **ProjectImage** (screenshots) and **ProjectContributor** (invitations with `PENDING` / `ACCEPTED` / `DECLINED`).
@@ -192,7 +195,7 @@ The data model lives in [server/prisma/schema.prisma](server/prisma/schema.prism
 
 All primary keys are UUIDs. Foreign keys cascade where child data is meaningless without its parent. A category that still has projects can't be deleted. `likeCount` and `commentCount` on Project are denormalised and updated in the same transaction as the like or comment. The 10 default categories are created by a migration, so every new database has them.
 
-Prisma 7 notes: the client is generated into `server/src/generated/` (git-ignored) on `npm install` and on every build, and connects through the `pg` driver adapter ([server/src/config/prisma.ts](server/src/config/prisma.ts)). The Prisma CLI reads `server/.env` via [server/prisma.config.ts](server/prisma.config.ts); variables already set in the environment take precedence.
+Prisma 7 notes: the client is generated into `server/src/generated/` (git-ignored) on `npm install` and on every build, and connects through the `pg` driver adapter ([server/src/config/prisma.ts](student-project-hub/server/src/config/prisma.ts)). The Prisma CLI reads `server/.env` via [server/prisma.config.ts](student-project-hub/server/prisma.config.ts); variables already set in the environment take precedence.
 
 | Command (from repo root) | What it does |
 |---|---|
@@ -213,20 +216,20 @@ npm test -w client    # component tests
 npm run typecheck     # TypeScript, both apps
 ```
 
-**Server (66 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
+**Server (68 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
 
 | File | Covers |
 |---|---|
 | `auth.test.ts` | registration, hashing, duplicates, login by email/username, generic errors, suspended accounts, refresh-token rotation and replay, logout, CSRF, email verification, password reset |
 | `projects.test.ts` | create with images, auth and verified-email rules, validation, fake-image rejection, contributor invites, private-project access, owner/admin-only edit and delete, search/filter/sort/pagination, trending and featured |
 | `engagement.test.ts` | idempotent likes and counts, notifications, clearing only your own notifications, threaded comments, author-only edit, soft delete, reports |
-| `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, manual email verification (admin-only, one-time, unlocks posting at once, notifies the student) |
+| `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, manual email verification (admin-only, one-time, unlocks posting at once, notifies the student), unverified count |
 | `meta.test.ts` | public stats count only public projects and active students |
 | `rate-limit-store.test.ts` | database-backed rate-limit counters: windows, sharing across instances, concurrency |
-| `realtime.test.ts` | live-update pings for likes, replies and project changes; nothing sent for failed requests; unguessable user topics |
+| `realtime.test.ts` | live-update pings for likes, replies and project changes; nothing sent for failed requests; unguessable user topics; the admin topic (admins only; pinged on sign-ups, reports and admin actions) |
 | `share.test.ts` | link-preview tags for public projects, HTML escaping, private projects never described, 1200×630 preview image, fallback image |
 
-**Client (21 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, and the live-update hook (subscribe, debounce, disabled when not configured).
+**Client (25 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, the live-update hook (subscribe, debounce, disabled when not configured), and the admin Students tab (instant verify with rollback, confirmation before granting admin, bulk verify, details panel).
 
 ---
 
@@ -276,8 +279,9 @@ Base path: `/api/v1`. 🔒 session required · ✉️ verified email required ·
 2. The pings are sent in one batch just before the response, after the database transaction has committed. Nothing is sent for failed requests.
 3. Browsers listen with the public anon key. On a ping they refetch through the normal API, so pings carry **no data** and every read is still authorised.
 4. A user's private topic is an HMAC of their ID with the server secret, so it can't be guessed. Signed-in users see a toast for new notifications.
+5. Admins also get a shared admin topic (from `/auth/me`, admins only). Sign-ups, new reports and every admin action ping it, so open dashboards, tab badges and counts refresh for all admins.
 
-The relevant code: [realtime.service.ts](server/src/services/realtime.service.ts) and [use-live-topic.ts](client/src/hooks/use-live-topic.ts).
+The relevant code: [realtime.service.ts](student-project-hub/server/src/services/realtime.service.ts) and [use-live-topic.ts](student-project-hub/client/src/hooks/use-live-topic.ts).
 
 **Link previews.** Social apps don't run JavaScript, so `vercel.json` routes `/projects/:id` requests whose user agent is a known crawler (WhatsApp, LinkedIn, X, Slack, Discord, Telegram, …) to the API. The API returns the normal page HTML with that project's title, description and image tags. `/og/projects/:id.jpg` converts the cover to a 1200×630 JPEG; projects without a cover use `client/public/og-image.png`. Only public projects are described, and all user text is HTML-escaped. Regular browsers always get the static app. Previews are cached at Vercel's edge for up to 10 minutes, and social apps cache them much longer.
 
@@ -302,7 +306,7 @@ The relevant code: [realtime.service.ts](server/src/services/realtime.service.ts
 
 ## Deployment (Vercel + Supabase)
 
-The whole app is **one Vercel project**: Vercel serves the built website and runs the Express API as a serverless function ([api/index.js](api/index.js)) on the same domain. **Supabase** provides the database, image storage and Realtime. [vercel.json](vercel.json) holds the build settings and routing.
+The whole app is **one Vercel project**: Vercel serves the built website and runs the Express API as a serverless function ([api/index.js](student-project-hub/api/index.js)) on the same domain. **Supabase** provides the database, image storage and Realtime. [vercel.json](student-project-hub/vercel.json) holds the build settings and routing.
 
 ### 1. Supabase
 
@@ -339,7 +343,7 @@ Supabase doesn't send email for your app. With [Resend](https://resend.com):
    | `EMAIL_FROM` | From step 2 |
 
    **Don't set** `NODE_ENV` (setting it to `production` makes `npm ci` skip the dev dependencies the build needs) or `VITE_API_URL`. Set `CLIENT_URL` and `CORS_ORIGINS` only if you add a custom domain.
-3. Deploy. Every push to `main` deploys automatically. On production deployments [scripts/vercel-build.js](scripts/vercel-build.js) first applies database migrations through `DIRECT_URL`, then builds the server and the website. Preview deployments skip migrations.
+3. Deploy. Every push to `main` deploys automatically. On production deployments [scripts/vercel-build.js](student-project-hub/scripts/vercel-build.js) first applies database migrations through `DIRECT_URL`, then builds the server and the website. Preview deployments skip migrations.
 
 **Check after a deploy:**
 
@@ -355,10 +359,12 @@ Supabase doesn't send email for your app. With [Resend](https://resend.com):
 
 ## Running the live site
 
-Day-to-day user management happens in **Admin → Users**; no SQL needed:
+Day-to-day management happens in the **Admin** dashboard; no SQL needed. It updates live, and the **Students** and **Reports** tabs show badges for unverified students and pending reports. Search, filters and page number live in the address bar, so refreshing or going back keeps your place; press `/` to jump to the search box.
 
-- **Verify an email by hand** (needed while emails only reach your own address): pick **Unverified only** in the filter, then click **Verify email** next to the person. They can upload and comment straight away, without signing out, and get a notification saying so. Verification can't be undone; use **Suspend** for bad actors.
-- **Make someone an admin** with **Make admin**, or **Suspend** an account, from the same row.
+- **Verify an email by hand** (needed while emails only reach your own address): the overview links straight to unverified students. Click **Verify** on a row, or tick several and use **Verify selected**. They can upload and comment straight away, without signing out, and get a notification saying so. Verification can't be undone; use **Suspend** for bad actors.
+- **See everything about a student:** click their row to open a side panel with their details, stats, projects and actions.
+- **Make someone an admin, remove admin access, or suspend an account** from the row's **⋯** menu or the side panel. These ask for confirmation first; reactivating doesn't.
+- Actions show on screen immediately and roll back with an error message if the server refuses.
 
 SQL (in **Supabase → SQL Editor**, keeping the double quotes around names) is only needed if no admin can sign in, for example to create the very first admin:
 

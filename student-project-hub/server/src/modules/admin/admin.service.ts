@@ -25,6 +25,7 @@ export async function getStatistics() {
     comments,
     likes,
     pendingReports,
+    unverifiedUsers,
     byCategory,
     recentSignups,
     recentProjects,
@@ -38,6 +39,7 @@ export async function getStatistics() {
     prisma.comment.count({ where: { deletedAt: null } }),
     prisma.like.count(),
     prisma.report.count({ where: { status: 'PENDING' } }),
+    prisma.user.count({ where: { emailVerifiedAt: null } }),
     prisma.category.findMany({
       select: { name: true, _count: { select: { projects: true } } },
       orderBy: { name: 'asc' },
@@ -75,6 +77,7 @@ export async function getStatistics() {
       comments,
       likes,
       pendingReports,
+      unverifiedUsers,
     },
     projectsByCategory: byCategory.map((c) => ({ name: c.name, count: c._count.projects })),
     daily: days.map((date) => ({

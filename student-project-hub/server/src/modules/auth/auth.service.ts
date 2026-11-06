@@ -5,6 +5,7 @@ import { prisma } from '../../config/prisma.js';
 import { signAccessToken } from '../../middleware/auth.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../../services/email.service.js';
 import { ApiError } from '../../utils/api-error.js';
+import { adminTopic, queueTopic } from '../../services/realtime.service.js';
 import { generateToken, hashToken } from '../../utils/tokens.js';
 import { toSelfUser } from '../users/user.select.js';
 import type { LoginInput, RegisterInput } from './auth.schemas.js';
@@ -96,6 +97,7 @@ export async function register(input: RegisterInput, ctx: SessionContext) {
 
   const token = await issueAuthToken(user.id, 'EMAIL_VERIFICATION', VERIFICATION_TTL_MS);
   await sendVerificationEmail(user.email, user.fullName, token);
+  queueTopic(adminTopic()); // a new student appears on admin dashboards
 
   return { user: toSelfUser(user), session: await createSession(user.id, ctx) };
 }

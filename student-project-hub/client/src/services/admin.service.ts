@@ -12,6 +12,7 @@ export interface AdminStatistics {
     comments: number;
     likes: number;
     pendingReports: number;
+    unverifiedUsers: number;
   };
   projectsByCategory: { name: string; count: number }[];
   daily: { date: string; signups: number; projects: number }[];
