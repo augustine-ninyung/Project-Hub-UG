@@ -10,10 +10,50 @@
       "includeFiles": "{node_modules/@img/**,node_modules/argon2/**,node_modules/@prisma/client/runtime/client.mjs,node_modules/@prisma/client/runtime/query_compiler_fast_bg.postgresql.*,client/dist/index.html}"
     }
   },
+  "headers": [
+    {
+      "source": "/((?!api/|og/|health).*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://gxzbcrvsojdjbibfyieq.supabase.co; connect-src 'self' https://gxzbcrvsojdjbibfyieq.supabase.co wss://gxzbcrvsojdjbibfyieq.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        }
+      ]
+    }
+  ],
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" },
-    { "source": "/health", "destination": "/api" },
-    { "source": "/og/:path*", "destination": "/api" },
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/health",
+      "destination": "/api"
+    },
+    {
+      "source": "/og/:path*",
+      "destination": "/api"
+    },
     {
       "source": "/projects/:id",
       "has": [
@@ -25,6 +65,9 @@
       ],
       "destination": "/api"
     },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
