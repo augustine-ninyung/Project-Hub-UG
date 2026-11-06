@@ -1,4 +1,9 @@
 import { z } from 'zod';
+
+export const deletionRequestSchema = z.object({
+  password: z.string().min(1, 'Enter your password to confirm').max(128),
+  reason: z.string().trim().max(500).optional(),
+});
 import { optionalUrl, uniqueCaseInsensitive } from '../../utils/common-schemas.js';
 import { usernameSchema } from '../auth/auth.schemas.js';
 

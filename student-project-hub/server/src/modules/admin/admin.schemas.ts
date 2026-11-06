@@ -10,6 +10,7 @@ export const adminUsersQuery = paginationQuery.extend({
     .enum(['true', 'false'])
     .transform((v) => v === 'true')
     .optional(),
+  deletion: z.enum(['requested']).optional(),
 });
 
 export const updateUserSchema = z

@@ -24,6 +24,12 @@ export interface ProfileUpdate {
 
 export const userService = {
   profile: (idOrUsername: string) => request<Profile>({ url: `/users/${idOrUsername}` }),
+  requestDeletion: (password: string, reason?: string) =>
+    request<{ requestedAt: string }>({
+      method: 'POST',
+      url: '/users/me/deletion-request',
+      data: { password, reason: reason?.trim() || undefined },
+    }),
   search: (search: string) => request<UserSummary[]>({ url: '/users', params: { search } }),
   active: (limit = 8) => request<ActiveUser[]>({ url: '/users/active', params: { limit } }),
   updateMe: (data: ProfileUpdate) =>

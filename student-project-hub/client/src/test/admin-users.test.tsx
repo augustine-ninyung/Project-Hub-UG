@@ -6,7 +6,7 @@ import { adminService, type AdminUser } from '@/services/admin.service';
 import { renderWithProviders, testUser } from './utils';
 
 vi.mock('@/services/admin.service', () => ({
-  adminService: { users: vi.fn(), verifyEmail: vi.fn(), updateUser: vi.fn() },
+  adminService: { users: vi.fn(), verifyEmail: vi.fn(), updateUser: vi.fn(), deleteAccount: vi.fn(), keepAccount: vi.fn() },
 }));
 vi.mock('@/services/user.service', () => ({
   userService: { profile: vi.fn(() => new Promise(() => {})) },
@@ -26,6 +26,8 @@ const person = (id: string, over: Partial<AdminUser> = {}): AdminUser => ({
   role: 'STUDENT',
   status: 'ACTIVE',
   emailVerifiedAt: null,
+  deletionRequestedAt: null,
+  deletionReason: null,
   lastActiveAt: null,
   createdAt: new Date().toISOString(),
   _count: { projects: 0, comments: 0 },
@@ -104,5 +106,32 @@ describe('Admin students tab', () => {
     const panel = await screen.findByRole('dialog');
     expect(within(panel).getByText('yaw@example.edu')).toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: /Verify email/ })).toBeInTheDocument();
+  });
+});
+
+describe('Admin deletion requests', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('deletes only after the admin types the username', async () => {
+    const requested = person('kwesi', { deletionRequestedAt: new Date().toISOString(), deletionReason: 'Graduated' });
+    vi.mocked(adminService.users).mockResolvedValue({
+      items: [requested],
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
+    vi.mocked(adminService.deleteAccount).mockResolvedValue(undefined);
+    renderWithProviders(<AdminUsers />, { user: admin });
+
+    await screen.findByText('Student kwesi');
+    expect(within(row('Student kwesi')).getByText('Deletion requested')).toBeInTheDocument();
+    await userEvent.click(within(row('Student kwesi')).getByRole('button', { name: /Delete/ }));
+
+    const dialog = await screen.findByRole('dialog');
+    const confirm = within(dialog).getByRole('button', { name: /Delete permanently/ });
+    expect(confirm).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText(/Type kwesi to confirm/), 'kwes');
+    expect(confirm).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText(/Type kwesi to confirm/), 'i');
+    await userEvent.click(confirm);
+    expect(adminService.deleteAccount).toHaveBeenCalledWith('kwesi');
   });
 });

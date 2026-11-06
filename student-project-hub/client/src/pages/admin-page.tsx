@@ -22,11 +22,19 @@ export default function AdminPage() {
     void queryClient.invalidateQueries({ queryKey: ['categories'] });
   });
 
-  const tabs = [
+  type Badge = { count: number | undefined; hint: string; urgent?: boolean };
+  const tabs: { to: string; label: string; end?: boolean; badges?: Badge[] }[] = [
     { to: '/admin', label: 'Overview', end: true },
-    { to: '/admin/users', label: 'Students', count: t?.unverifiedUsers, hint: 'unverified' },
+    {
+      to: '/admin/users',
+      label: 'Students',
+      badges: [
+        { count: t?.deletionRequests, hint: 'asked to be deleted', urgent: true },
+        { count: t?.unverifiedUsers, hint: 'unverified' },
+      ],
+    },
     { to: '/admin/projects', label: 'Projects' },
-    { to: '/admin/reports', label: 'Reports', count: t?.pendingReports, hint: 'pending', urgent: true },
+    { to: '/admin/reports', label: 'Reports', badges: [{ count: t?.pendingReports, hint: 'pending', urgent: true }] },
     { to: '/admin/categories', label: 'Categories' },
   ];
 
@@ -47,18 +55,21 @@ export default function AdminPage() {
             }
           >
             {tab.label}
-            {!!tab.count && (
-              <span
-                key={tab.count}
-                className={cn(
-                  'min-w-5 animate-pop rounded-full px-1.5 py-px text-center text-[11px] font-semibold tabular-nums',
-                  tab.urgent ? 'bg-destructive text-white' : 'bg-warning/20 text-warning',
-                )}
-                aria-label={`${tab.count} ${tab.hint}`}
-                title={`${tab.count} ${tab.hint}`}
-              >
-                {tab.count}
-              </span>
+            {tab.badges?.map(
+              (b) =>
+                !!b.count && (
+                  <span
+                    key={`${b.hint}-${b.count}`}
+                    className={cn(
+                      '-ml-1 min-w-5 animate-pop rounded-full px-1.5 py-px text-center text-[11px] font-semibold tabular-nums first-of-type:ml-0',
+                      b.urgent ? 'bg-destructive text-white' : 'bg-warning/20 text-warning',
+                    )}
+                    aria-label={`${b.count} ${b.hint}`}
+                    title={`${b.count} ${b.hint}`}
+                  >
+                    {b.count}
+                  </span>
+                ),
             )}
           </NavLink>
         ))}

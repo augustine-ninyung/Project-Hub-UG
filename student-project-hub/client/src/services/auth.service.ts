@@ -12,10 +12,13 @@ export interface RegisterPayload {
 
 export const authService = {
   me: () => request<{ user: SelfUser }>({ url: '/auth/me' }).then((d) => d.user),
-  login: (identifier: string, password: string) =>
-    request<{ user: SelfUser }>({ method: 'POST', url: '/auth/login', data: { identifier, password } }).then(
-      (d) => d.user,
-    ),
+  /** `cancelDeletion` withdraws a pending account-deletion request while signing in. */
+  login: (identifier: string, password: string, cancelDeletion = false) =>
+    request<{ user: SelfUser }>({
+      method: 'POST',
+      url: '/auth/login',
+      data: { identifier, password, ...(cancelDeletion ? { cancelDeletion } : {}) },
+    }).then((d) => d.user),
   register: (data: RegisterPayload) =>
     request<{ user: SelfUser }>({ method: 'POST', url: '/auth/register', data }).then((d) => d.user),
   logout: () => request({ method: 'POST', url: '/auth/logout' }),

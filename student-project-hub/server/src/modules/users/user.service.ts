@@ -1,4 +1,6 @@
+import argon2 from 'argon2';
 import { prisma } from '../../config/prisma.js';
+import { adminTopic, queueTopic } from '../../services/realtime.service.js';
 import { removeImages, storeImage } from '../../services/storage.service.js';
 import type { AuthUser } from '../../types/express.js';
 import { ApiError } from '../../utils/api-error.js';
@@ -65,11 +67,13 @@ export async function getProfile(identifier: string, viewer?: AuthUser) {
       portfolioUrl: true,
       role: true,
       status: true,
+      deletionRequestedAt: true,
       createdAt: true,
       lastActiveAt: true,
     },
   });
-  if (!user || (user.status === 'SUSPENDED' && viewer?.role !== 'ADMIN')) {
+  const hidden = user && (user.status === 'SUSPENDED' || user.deletionRequestedAt !== null);
+  if (!user || (hidden && viewer?.role !== 'ADMIN')) {
     throw ApiError.notFound('User not found');
   }
 
@@ -113,6 +117,7 @@ export async function searchUsers(search: string, limit: number, excludeId?: str
   return prisma.user.findMany({
     where: {
       status: 'ACTIVE',
+      deletionRequestedAt: null,
       ...(excludeId ? { id: { not: excludeId } } : {}),
       OR: [
         { username: { contains: search, mode: 'insensitive' } },
@@ -128,7 +133,7 @@ export async function searchUsers(search: string, limit: number, excludeId?: str
 /** "Recently active students" on the dashboard. */
 export async function recentlyActive(limit: number) {
   const users = await prisma.user.findMany({
-    where: { status: 'ACTIVE', lastActiveAt: { not: null } },
+    where: { status: 'ACTIVE', deletionRequestedAt: null, lastActiveAt: { not: null } },
     select: {
       ...userSummarySelect,
       lastActiveAt: true,
@@ -138,4 +143,28 @@ export async function recentlyActive(limit: number) {
     take: limit,
   });
   return users.map(({ _count, ...u }) => ({ ...u, projectCount: _count.projects }));
+}
+
+/**
+ * The student asks for their account to be deleted. They are signed out
+ * everywhere and hidden at once; an admin then deletes the account for good,
+ * or keeps it. Signing in again before then withdraws the request.
+ */
+export async function requestAccountDeletion(userId: string, input: { password: string; reason?: string }) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { passwordHash: true } });
+  if (!(await argon2.verify(user.passwordHash, input.password))) {
+    throw new ApiError(422, 'Incorrect password', 'VALIDATION_ERROR', [
+      { path: 'password', message: 'Incorrect password' },
+    ]);
+  }
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { deletionRequestedAt: now, deletionReason: input.reason?.trim() || null },
+    }),
+    prisma.userSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } }),
+  ]);
+  queueTopic(adminTopic());
+  return { requestedAt: now };
 }

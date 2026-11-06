@@ -31,7 +31,7 @@ function setSessionCookies(res: Response, session: IssuedSession) {
   });
 }
 
-function clearSessionCookies(res: Response) {
+export function clearSessionCookies(res: Response) {
   res.clearCookie(ACCESS_COOKIE, { ...baseCookie, path: '/' });
   res.clearCookie(REFRESH_COOKIE, { ...baseCookie, path: REFRESH_PATH });
 }

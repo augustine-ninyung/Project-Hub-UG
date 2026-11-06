@@ -11,7 +11,7 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  login: (identifier: string, password: string) => Promise<SelfUser>;
+  login: (identifier: string, password: string, cancelDeletion?: boolean) => Promise<SelfUser>;
   register: (data: RegisterPayload) => Promise<SelfUser>;
   logout: () => Promise<void>;
   setUser: (user: SelfUser) => void;
@@ -51,8 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setUser]);
 
   const login = useCallback(
-    async (identifier: string, password: string) => {
-      const u = await authService.login(identifier, password);
+    async (identifier: string, password: string, cancelDeletion = false) => {
+      const u = await authService.login(identifier, password, cancelDeletion);
       // Personalised data (likedByMe, recommendations) must be refetched.
       queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' });
       setUser(u);

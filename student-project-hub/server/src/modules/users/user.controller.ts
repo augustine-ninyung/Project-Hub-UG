@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { ApiError } from '../../utils/api-error.js';
 import { sendSuccess } from '../../utils/response.js';
+import { clearSessionCookies } from '../auth/auth.controller.js';
 import { getSelf } from '../auth/auth.service.js';
 import { listInvitations } from '../projects/contributor.service.js';
 import * as userService from './user.service.js';
@@ -39,4 +40,10 @@ export async function search(req: Request, res: Response) {
 export async function recentlyActive(req: Request, res: Response) {
   const { limit } = req.validated.query as { limit: number };
   sendSuccess(res, await userService.recentlyActive(limit));
+}
+
+export async function requestDeletion(req: Request, res: Response) {
+  const result = await userService.requestAccountDeletion(req.user!.id, req.body);
+  clearSessionCookies(res);
+  sendSuccess(res, result);
 }

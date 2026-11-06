@@ -33,6 +33,8 @@ adminRouter.patch(
   validate({ params: uuidParam, body: updateUserSchema }),
   controller.updateUser,
 );
+adminRouter.delete('/users/:id', validate({ params: uuidParam }), controller.deleteAccount);
+adminRouter.post('/users/:id/keep', validate({ params: uuidParam }), controller.keepAccount);
 adminRouter.post(
   '/users/:id/verify-email',
   validate({ params: uuidParam }),

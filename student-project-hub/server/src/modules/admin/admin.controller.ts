@@ -28,6 +28,14 @@ export async function verifyUserEmail(req: Request, res: Response) {
   sendSuccess(res, await adminService.verifyUserEmail(idOf(req), req.user!));
 }
 
+export async function deleteAccount(req: Request, res: Response) {
+  sendSuccess(res, await adminService.deleteRequestedAccount(idOf(req), req.user!));
+}
+
+export async function keepAccount(req: Request, res: Response) {
+  sendSuccess(res, await adminService.keepRequestedAccount(idOf(req), req.user!));
+}
+
 export async function projects(req: Request, res: Response) {
   const query = req.validated.query as AdminProjectsQuery;
   const { items, total } = await adminService.listProjects(query);

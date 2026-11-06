@@ -8,6 +8,8 @@ import {
   PanelRightOpen,
   Shield,
   ShieldOff,
+  Trash2,
+  Undo2,
   Users,
   X,
 } from 'lucide-react';
@@ -26,7 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Select } from '@/components/ui/form-controls';
+import { DialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog';
+import { Field, Input, Select } from '@/components/ui/form-controls';
 import { Badge, Skeleton, UserAvatar } from '@/components/ui/misc';
 import { useAuth } from '@/context/auth-context';
 import { adminService, type AdminUser } from '@/services/admin.service';
@@ -59,7 +62,73 @@ function useUserActions() {
             ? 'Admin access granted'
             : 'Admin access removed',
   });
-  return { verify, update };
+  // Only for students who asked to be deleted (the server enforces this too).
+  const deleteAccount = useOptimisticRows<AdminUser, string>({
+    listKey: LIST_KEY,
+    mutationFn: (id) => adminService.deleteAccount(id),
+    apply: (u, id) => (u.id === id ? null : u),
+    success: 'Account and all its content permanently deleted',
+  });
+  const keepAccount = useOptimisticRows<AdminUser, string>({
+    listKey: LIST_KEY,
+    mutationFn: (id) => adminService.keepAccount(id),
+    apply: (u, id) => (u.id === id ? { ...u, deletionRequestedAt: null, deletionReason: null } : u),
+    success: 'Request declined. The account works again.',
+  });
+  return { verify, update, deleteAccount, keepAccount };
+}
+
+/**
+ * Permanent deletion: the admin types the username, so it can't happen by a
+ * stray click.
+ */
+function DeleteAccountConfirm({
+  user,
+  onClose,
+  onConfirm,
+}: {
+  user: AdminUser | null;
+  onClose: () => void;
+  onConfirm: (u: AdminUser) => void;
+}) {
+  const [typed, setTyped] = useState('');
+  useEffect(() => setTyped(''), [user]);
+  const matches = typed.trim().toLowerCase() === user?.username;
+  return (
+    <Dialog open={!!user} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader
+          title={`Permanently delete @${user?.username}?`}
+          description={`${user?.fullName} asked for this. Their account, ${plural(user?._count.projects ?? 0, 'project')}, comments, likes and images are deleted for good. Replies other students left under their comments go too. This cannot be undone.`}
+        />
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (user && matches) onConfirm(user);
+          }}
+        >
+          <Field label={`Type ${user?.username ?? ''} to confirm`} htmlFor="confirm-username">
+            <Input
+              id="confirm-username"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoComplete="off"
+              autoFocus
+            />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="destructive" disabled={!matches}>
+              <Trash2 /> Delete permanently
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function StatusBadges({ user }: { user: AdminUser }) {
@@ -72,6 +141,7 @@ function StatusBadges({ user }: { user: AdminUser }) {
         <Badge variant="success">Active</Badge>
       )}
       {!user.emailVerifiedAt && <Badge variant="warning">Unverified</Badge>}
+      {user.deletionRequestedAt && <Badge variant="destructive">Deletion requested</Badge>}
     </span>
   );
 }
@@ -127,16 +197,27 @@ function RowActions({
   user,
   onOpen,
   onSensitive,
+  onDelete,
   actions,
 }: {
   user: AdminUser;
   onOpen: () => void;
   onSensitive: (p: Sensitive) => void;
+  onDelete: (u: AdminUser) => void;
   actions: ReturnType<typeof useUserActions>;
 }) {
   return (
     <div className="flex items-center justify-end gap-1">
-      {!user.emailVerifiedAt && (
+      {user.deletionRequestedAt ? (
+        <>
+          <Button variant="outline" size="sm" onClick={() => actions.keepAccount.mutate(user.id)}>
+            <Undo2 /> Keep
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => onDelete(user)}>
+            <Trash2 /> Delete
+          </Button>
+        </>
+      ) : !user.emailVerifiedAt && (
         <Button variant="outline" size="sm" onClick={() => actions.verify.mutate(user.id)}>
           <MailCheck /> Verify
         </Button>
@@ -198,12 +279,14 @@ function UserPanel({
   isSelf,
   onClose,
   onSensitive,
+  onDelete,
   actions,
 }: {
   user: AdminUser | null;
   isSelf: boolean;
   onClose: () => void;
   onSensitive: (p: Sensitive) => void;
+  onDelete: (u: AdminUser) => void;
   actions: ReturnType<typeof useUserActions>;
 }) {
   const profile = useQuery({
@@ -299,10 +382,34 @@ function UserPanel({
               )
             )}
 
+            {user.deletionRequestedAt && !isSelf && (
+              <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-destructive">Asked for their account to be deleted</p>
+                  <p className="text-xs text-muted-foreground">
+                    {timeAgo(user.deletionRequestedAt)} · they are signed out and hidden until you decide
+                  </p>
+                </div>
+                {user.deletionReason && (
+                  <blockquote className="border-l-2 border-destructive/40 pl-3 text-sm italic">
+                    {user.deletionReason}
+                  </blockquote>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => actions.keepAccount.mutate(user.id)}>
+                    <Undo2 /> Keep account
+                  </Button>
+                  <Button variant="destructive" onClick={() => onDelete(user)}>
+                    <Trash2 /> Delete
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2 border-t pt-4">
               {isSelf ? (
                 <p className="text-sm text-muted-foreground">This is your own account. Another admin can change your role or status.</p>
-              ) : (
+              ) : user.deletionRequestedAt ? null : (
                 <>
                   {!user.emailVerifiedAt && (
                     <Button className="w-full" onClick={() => actions.verify.mutate(user.id)}>
@@ -354,10 +461,11 @@ export function AdminUsers() {
   const verified = get('verified');
   const role = get('role');
   const status = get('status');
+  const deletion = get('deletion') === 'requested';
   const openId = get('user');
 
   const query = useQuery({
-    queryKey: [...LIST_KEY, { page, q, verified, role, status }],
+    queryKey: [...LIST_KEY, { page, q, verified, role, status, deletion }],
     queryFn: () =>
       adminService.users({
         page,
@@ -365,12 +473,14 @@ export function AdminUsers() {
         verified: verified ? verified === 'true' : undefined,
         role: (role || undefined) as AdminUser['role'] | undefined,
         status: status || undefined,
+        deletion: deletion ? 'requested' : undefined,
       }),
     placeholderData: keepPreviousData,
   });
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
   const actions = useUserActions();
   const [pending, setPending] = useState<Sensitive | null>(null);
+  const [toDelete, setToDelete] = useState<AdminUser | null>(null);
 
   // The panel follows the live row (so optimistic changes show), and keeps
   // its last copy if the row drops out of a filtered list.
@@ -408,7 +518,7 @@ export function AdminUsers() {
     void queryClient.invalidateQueries({ queryKey: ['admin'] });
   };
 
-  const filtersActive = Boolean(q || verified || role || status);
+  const filtersActive = Boolean(q || verified || role || status || deletion);
   const busy = query.isFetching && query.isPlaceholderData;
 
   return (
@@ -420,10 +530,20 @@ export function AdminUsers() {
           <option value="false">Unverified</option>
           <option value="true">Verified</option>
         </Select>
-        <Select value={status} onChange={(e) => set({ status: e.target.value, page: null })} className="w-36" aria-label="Status">
+        <Select
+          value={deletion ? 'deletion' : status}
+          onChange={(e) =>
+            e.target.value === 'deletion'
+              ? set({ deletion: 'requested', status: null, page: null })
+              : set({ status: e.target.value, deletion: null, page: null })
+          }
+          className="w-44"
+          aria-label="Status"
+        >
           <option value="">Any status</option>
           <option value="ACTIVE">Active</option>
           <option value="SUSPENDED">Suspended</option>
+          <option value="deletion">Deletion requested</option>
         </Select>
         <Select value={role} onChange={(e) => set({ role: e.target.value, page: null })} className="w-32" aria-label="Role">
           <option value="">Any role</option>
@@ -431,7 +551,7 @@ export function AdminUsers() {
           <option value="ADMIN">Admins</option>
         </Select>
         {filtersActive && (
-          <Button variant="ghost" size="sm" onClick={() => set({ q: null, verified: null, role: null, status: null, page: null })}>
+          <Button variant="ghost" size="sm" onClick={() => set({ q: null, verified: null, role: null, status: null, deletion: null, page: null })}>
             <X /> Clear filters
           </Button>
         )}
@@ -536,7 +656,13 @@ export function AdminUsers() {
                     </td>
                     <td className="px-4 py-3">
                       {u.id !== me?.id && (
-                        <RowActions user={u} onOpen={() => openPanel(u)} onSensitive={setPending} actions={actions} />
+                        <RowActions
+                          user={u}
+                          onOpen={() => openPanel(u)}
+                          onSensitive={setPending}
+                          onDelete={setToDelete}
+                          actions={actions}
+                        />
                       )}
                     </td>
                   </tr>
@@ -553,7 +679,17 @@ export function AdminUsers() {
         isSelf={panelUser?.id === me?.id}
         onClose={() => set({ user: null })}
         onSensitive={setPending}
+        onDelete={setToDelete}
         actions={actions}
+      />
+      <DeleteAccountConfirm
+        user={toDelete}
+        onClose={() => setToDelete(null)}
+        onConfirm={(u) => {
+          setToDelete(null);
+          if (openId === u.id) set({ user: null }); // the account is gone
+          actions.deleteAccount.mutate(u.id);
+        }}
       />
       <SensitiveConfirm
         pending={pending}

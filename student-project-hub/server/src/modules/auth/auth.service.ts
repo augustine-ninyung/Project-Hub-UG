@@ -116,8 +116,23 @@ export async function login(input: LoginInput, ctx: SessionContext) {
   if (user.status === 'SUSPENDED') {
     throw new ApiError(403, 'This account has been suspended', 'ACCOUNT_SUSPENDED');
   }
+  // Only reached with the right password, so this reveals nothing to others.
+  if (user.deletionRequestedAt && !input.cancelDeletion) {
+    throw new ApiError(
+      403,
+      'You asked for this account to be deleted, and an admin will confirm it soon. You can keep your account instead.',
+      'ACCOUNT_DELETION_PENDING',
+    );
+  }
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      lastActiveAt: new Date(),
+      ...(user.deletionRequestedAt ? { deletionRequestedAt: null, deletionReason: null } : {}),
+    },
+  });
+  if (user.deletionRequestedAt) queueTopic(adminTopic()); // request withdrawn
   return { user: toSelfUser(user), session: await createSession(user.id, ctx) };
 }
 
@@ -127,7 +142,7 @@ export async function refresh(refreshToken: string | undefined, ctx: SessionCont
 
   const session = await prisma.userSession.findUnique({
     where: { refreshTokenHash: hashToken(refreshToken) },
-    include: { user: { select: { status: true } } },
+    include: { user: { select: { status: true, deletionRequestedAt: true } } },
   });
   if (!session) throw ApiError.unauthorized('Session expired');
 
@@ -142,7 +157,11 @@ export async function refresh(refreshToken: string | undefined, ctx: SessionCont
     }
     throw ApiError.unauthorized('Session expired');
   }
-  if (session.expiresAt < new Date() || session.user.status === 'SUSPENDED') {
+  if (
+    session.expiresAt < new Date() ||
+    session.user.status === 'SUSPENDED' ||
+    session.user.deletionRequestedAt
+  ) {
     throw ApiError.unauthorized('Session expired');
   }
 
@@ -182,7 +201,7 @@ export async function resendVerification(userId: string) {
 /** Always succeeds from the caller's perspective to avoid account enumeration. */
 export async function forgotPassword(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || user.status === 'SUSPENDED') return;
+  if (!user || user.status === 'SUSPENDED' || user.deletionRequestedAt) return;
   const token = await issueAuthToken(user.id, 'PASSWORD_RESET', RESET_TTL_MS);
   await sendPasswordResetEmail(user.email, user.fullName, token);
 }

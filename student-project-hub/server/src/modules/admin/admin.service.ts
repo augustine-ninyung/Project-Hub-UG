@@ -6,6 +6,8 @@ import { slugify } from '../../utils/common-schemas.js';
 import { deleteComment } from '../engagement/engagement.service.js';
 import { notify } from '../notifications/notification.service.js';
 import { deleteProject } from '../projects/project.service.js';
+import { removeImages } from '../../services/storage.service.js';
+import { FEED_TOPIC, projectTopic, queueTopic } from '../../services/realtime.service.js';
 import { userSummarySelect } from '../users/user.select.js';
 import type { AdminProjectsQuery, AdminReportsQuery, AdminUsersQuery } from './admin.schemas.js';
 
@@ -26,6 +28,7 @@ export async function getStatistics() {
     likes,
     pendingReports,
     unverifiedUsers,
+    deletionRequests,
     byCategory,
     recentSignups,
     recentProjects,
@@ -40,6 +43,7 @@ export async function getStatistics() {
     prisma.like.count(),
     prisma.report.count({ where: { status: 'PENDING' } }),
     prisma.user.count({ where: { emailVerifiedAt: null } }),
+    prisma.user.count({ where: { deletionRequestedAt: { not: null } } }),
     prisma.category.findMany({
       select: { name: true, _count: { select: { projects: true } } },
       orderBy: { name: 'asc' },
@@ -78,6 +82,7 @@ export async function getStatistics() {
       likes,
       pendingReports,
       unverifiedUsers,
+      deletionRequests,
     },
     projectsByCategory: byCategory.map((c) => ({ name: c.name, count: c._count.projects })),
     daily: days.map((date) => ({
@@ -167,6 +172,7 @@ export async function listUsers(query: AdminUsersQuery) {
   const where: Prisma.UserWhereInput = {
     ...(query.role ? { role: query.role } : {}),
     ...(query.status ? { status: query.status } : {}),
+    ...(query.deletion === 'requested' ? { deletionRequestedAt: { not: null } } : {}),
     ...(query.verified !== undefined
       ? { emailVerifiedAt: query.verified ? { not: null } : null }
       : {}),
@@ -189,11 +195,13 @@ export async function listUsers(query: AdminUsersQuery) {
         role: true,
         status: true,
         emailVerifiedAt: true,
+        deletionRequestedAt: true,
+        deletionReason: true,
         lastActiveAt: true,
         createdAt: true,
         _count: { select: { projects: true, comments: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: query.deletion ? { deletionRequestedAt: 'asc' } : { createdAt: 'desc' },
       skip: (query.page - 1) * query.limit,
       take: query.limit,
     }),
@@ -256,6 +264,50 @@ export async function verifyUserEmail(id: string, admin: AuthUser) {
       where: { id },
       select: { ...userSummarySelect, email: true, emailVerifiedAt: true },
     });
+  });
+}
+
+/** Admins act only on accounts whose owner asked for deletion. */
+async function findDeletionRequest(id: string, admin: AuthUser) {
+  if (id === admin.id) throw ApiError.badRequest('You cannot act on your own account here');
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      deletionRequestedAt: true,
+      avatarPath: true,
+      projects: { select: { id: true, coverImagePath: true, images: { select: { path: true } } } },
+    },
+  });
+  if (!user) throw ApiError.notFound('User not found');
+  if (!user.deletionRequestedAt) {
+    throw ApiError.conflict('This student has not asked for their account to be deleted');
+  }
+  return user;
+}
+
+/**
+ * Permanently deletes an account its owner asked to delete: their projects,
+ * comments, likes, notifications and uploaded images go with it.
+ */
+export async function deleteRequestedAccount(id: string, admin: AuthUser) {
+  const user = await findDeletionRequest(id, admin);
+  await prisma.user.delete({ where: { id } }); // cascades in the database
+  for (const p of user.projects) queueTopic(projectTopic(p.id));
+  queueTopic(FEED_TOPIC);
+  await removeImages([
+    user.avatarPath,
+    ...user.projects.flatMap((p) => [p.coverImagePath, ...p.images.map((i) => i.path)]),
+  ]);
+  return { deleted: true, projectsRemoved: user.projects.length };
+}
+
+/** Turns down a deletion request: the account works again. */
+export async function keepRequestedAccount(id: string, admin: AuthUser) {
+  await findDeletionRequest(id, admin);
+  return prisma.user.update({
+    where: { id },
+    data: { deletionRequestedAt: null, deletionReason: null },
+    select: { id: true, deletionRequestedAt: true },
   });
 }
 

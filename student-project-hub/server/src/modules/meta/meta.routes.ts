@@ -40,9 +40,9 @@ metaRouter.get('/realtime', (_req: Request, res: Response) => {
 metaRouter.get('/stats', async (_req: Request, res: Response) => {
   const [projects, students, universities, likes] = await Promise.all([
     prisma.project.count({ where: { visibility: 'PUBLIC' } }),
-    prisma.user.count({ where: { role: 'STUDENT', status: 'ACTIVE' } }),
+    prisma.user.count({ where: { role: 'STUDENT', status: 'ACTIVE', deletionRequestedAt: null } }),
     prisma.user.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', deletionRequestedAt: null },
       distinct: ['university'],
       select: { university: true },
     }),

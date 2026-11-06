@@ -290,7 +290,7 @@ export async function resolveInvitees(
 ) {
   if (invites.length === 0) return [];
   const users = await prisma.user.findMany({
-    where: { username: { in: invites.map((i) => i.username) }, status: 'ACTIVE' },
+    where: { username: { in: invites.map((i) => i.username) }, status: 'ACTIVE', deletionRequestedAt: null },
     select: { id: true, username: true },
   });
   return invites.map((invite) => {

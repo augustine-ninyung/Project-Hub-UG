@@ -28,6 +28,8 @@ export const loginSchema = z.object({
   /** Email address or username. */
   identifier: z.string().trim().toLowerCase().min(1, 'Email or username is required').max(254),
   password: z.string().min(1, 'Password is required').max(128),
+  /** Signing in with this set cancels a pending account-deletion request. */
+  cancelDeletion: z.boolean().optional(),
 });
 
 export const forgotPasswordSchema = z.object({

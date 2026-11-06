@@ -28,9 +28,10 @@ async function resolveUser(token: string | undefined): Promise<AuthUser | null> 
 
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { id: true, role: true, status: true, emailVerifiedAt: true, lastActiveAt: true },
+    select: { id: true, role: true, status: true, emailVerifiedAt: true, lastActiveAt: true, deletionRequestedAt: true },
   });
-  if (!user || user.status === 'SUSPENDED') return null;
+  // Suspended accounts and accounts waiting to be deleted can't act.
+  if (!user || user.status === 'SUSPENDED' || user.deletionRequestedAt) return null;
 
   // Throttled "last active" tracking powers the "recently active students" list.
   if (!user.lastActiveAt || Date.now() - user.lastActiveAt.getTime() > ACTIVITY_UPDATE_INTERVAL_MS) {

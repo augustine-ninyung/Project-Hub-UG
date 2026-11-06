@@ -13,6 +13,7 @@ export interface AdminStatistics {
     likes: number;
     pendingReports: number;
     unverifiedUsers: number;
+    deletionRequests: number;
   };
   projectsByCategory: { name: string; count: number }[];
   daily: { date: string; signups: number; projects: number }[];
@@ -23,6 +24,9 @@ export interface AdminUser extends UserSummary {
   role: Role;
   status: 'ACTIVE' | 'SUSPENDED';
   emailVerifiedAt: string | null;
+  /** Set when the student asked for their account to be deleted. */
+  deletionRequestedAt: string | null;
+  deletionReason: string | null;
   lastActiveAt: string | null;
   createdAt: string;
   _count: { projects: number; comments: number };
@@ -77,11 +81,21 @@ export const adminService = {
   statistics: () => request<AdminStatistics>({ url: '/admin/statistics' }),
   activity: () => request<ActivityEvent[]>({ url: '/admin/activity' }),
 
-  users: (params: { page: number; search?: string; role?: Role; status?: string; verified?: boolean }) =>
+  users: (params: {
+    page: number;
+    search?: string;
+    role?: Role;
+    status?: string;
+    verified?: boolean;
+    deletion?: 'requested';
+  }) =>
     requestPage<AdminUser>({ url: '/admin/users', params }),
   updateUser: (id: string, data: { role?: Role; status?: 'ACTIVE' | 'SUSPENDED' }) =>
     request({ method: 'PATCH', url: `/admin/users/${id}`, data }),
   verifyEmail: (id: string) => request({ method: 'POST', url: `/admin/users/${id}/verify-email` }),
+  /** Only for accounts whose owner asked to be deleted. */
+  deleteAccount: (id: string) => request({ method: 'DELETE', url: `/admin/users/${id}` }),
+  keepAccount: (id: string) => request({ method: 'POST', url: `/admin/users/${id}/keep` }),
 
   projects: (params: { page: number; search?: string; featured?: boolean }) =>
     requestPage<AdminProject>({ url: '/admin/projects', params }),

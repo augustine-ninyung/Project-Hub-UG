@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { FormAlert } from '@/components/common/form-alert';
 import { PageHeader } from '@/components/common/section';
+import { DeleteAccountCard } from '@/features/account/delete-account';
 import { TagInput } from '@/components/common/tag-input';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/form-controls';
@@ -201,6 +202,8 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
+
+        <DeleteAccountCard />
       </div>
     </div>
   );

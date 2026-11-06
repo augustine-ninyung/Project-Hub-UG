@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Flag, MailWarning } from 'lucide-react';
+import { ArrowRight, Flag, MailWarning, UserX } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ErrorState, PageLoader } from '@/components/common/states';
 import { Card, UserAvatar } from '@/components/ui/misc';
@@ -28,9 +28,23 @@ function StatTile({ label, value, sub, to }: { label: string; value: number; sub
 }
 
 /** Shortcuts to the work waiting for an admin; hidden when there is none. */
-function NeedsAttention({ unverified, reports }: { unverified: number; reports: number }) {
-  if (!unverified && !reports) return null;
+function NeedsAttention({
+  unverified,
+  reports,
+  deletions,
+}: {
+  unverified: number;
+  reports: number;
+  deletions: number;
+}) {
+  if (!unverified && !reports && !deletions) return null;
   const items = [
+    deletions > 0 && {
+      to: '/admin/users?deletion=requested',
+      icon: UserX,
+      text: `${deletions} student${deletions === 1 ? '' : 's'} asked to delete their account`,
+      tone: 'text-destructive bg-destructive/10',
+    },
     reports > 0 && {
       to: '/admin/reports',
       icon: Flag,
@@ -45,7 +59,7 @@ function NeedsAttention({ unverified, reports }: { unverified: number; reports: 
     },
   ].filter(Boolean) as { to: string; icon: typeof Flag; text: string; tone: string }[];
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-2">
       {items.map(({ to, icon: Icon, text, tone }) => (
         <Link
           key={to}
@@ -74,7 +88,7 @@ export function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      <NeedsAttention unverified={t.unverifiedUsers} reports={t.pendingReports} />
+      <NeedsAttention unverified={t.unverifiedUsers} reports={t.pendingReports} deletions={t.deletionRequests} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile to="/admin/users" label="Students" value={t.users} sub={`+${t.newUsers} this week · ${t.activeUsers} active`} />
         <StatTile to="/admin/projects" label="Projects" value={t.projects} sub={`${t.publicProjects} public · +${t.newProjects} this week`} />
