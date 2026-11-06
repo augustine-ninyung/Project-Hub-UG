@@ -266,7 +266,7 @@ export default function ProjectDetailPage() {
 
       {!!related.data?.length && (
         <Section title="Related projects">
-          <ProjectGrid projects={related.data} isLoading={false} className="xl:grid-cols-4" />
+          <ProjectGrid projects={related.data} isLoading={false} columns={4} />
         </Section>
       )}
 

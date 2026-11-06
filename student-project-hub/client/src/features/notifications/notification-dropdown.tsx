@@ -19,12 +19,15 @@ export function NotificationDropdown() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative"
+          className="relative data-[state=open]:bg-accent"
           aria-label={unread ? `Notifications (${unread} unread)` : 'Notifications'}
         >
           <Bell className="size-[18px]" />
           {unread > 0 && (
-            <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+            <span
+              key={unread}
+              className="absolute right-1 top-1 flex min-w-4 animate-pop items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground ring-2 ring-background"
+            >
               {unread > 9 ? '9+' : unread}
             </span>
           )}

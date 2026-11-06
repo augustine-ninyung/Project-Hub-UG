@@ -34,7 +34,7 @@ export const ProjectCard = memo(function ProjectCard({ project }: { project: Pro
   const extraTech = project.technologies.length - visibleTech.length;
 
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-ring">
+    <article className="group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-xs transition-[transform,box-shadow,border-color] duration-200 ease-smooth hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-md focus-within:ring-2 focus-within:ring-ring motion-reduce:hover:translate-y-0">
       <div className="relative aspect-[16/10] overflow-hidden bg-muted">
         {project.coverImageUrl ? (
           <img
@@ -42,7 +42,7 @@ export const ProjectCard = memo(function ProjectCard({ project }: { project: Pro
             alt=""
             loading="lazy"
             decoding="async"
-            className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="size-full object-cover transition-transform duration-500 ease-smooth group-hover:scale-[1.03]"
           />
         ) : (
           <CoverFallback title={project.title} />

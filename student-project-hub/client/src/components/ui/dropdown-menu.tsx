@@ -6,7 +6,7 @@ export const DropdownMenu = Menu.Root;
 export const DropdownMenuTrigger = Menu.Trigger;
 
 const surface =
-  'z-50 min-w-44 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-scale-in';
+  'z-50 min-w-44 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg outline-none data-[state=open]:animate-scale-in data-[state=closed]:animate-scale-out';
 
 export function DropdownMenuContent({
   className,
@@ -15,7 +15,11 @@ export function DropdownMenuContent({
 }: ComponentProps<typeof Menu.Content>) {
   return (
     <Menu.Portal>
-      <Menu.Content sideOffset={sideOffset} className={cn(surface, className)} {...props} />
+      <Menu.Content
+        sideOffset={sideOffset}
+        className={cn(surface, 'origin-(--radix-dropdown-menu-content-transform-origin)', className)}
+        {...props}
+      />
     </Menu.Portal>
   );
 }
@@ -28,7 +32,7 @@ export function DropdownMenuItem({
   return (
     <Menu.Item
       className={cn(
-        'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:text-muted-foreground',
+        'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors duration-100 focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:text-muted-foreground',
         destructive && 'text-destructive focus:bg-destructive/10 [&_svg]:text-destructive',
         className,
       )}
@@ -60,7 +64,7 @@ export function PopoverContent({
       <PopoverPrimitive.Content
         sideOffset={sideOffset}
         align={align}
-        className={cn(surface, 'p-0', className)}
+        className={cn(surface, 'origin-(--radix-popover-content-transform-origin) p-0', className)}
         {...props}
       />
     </PopoverPrimitive.Portal>

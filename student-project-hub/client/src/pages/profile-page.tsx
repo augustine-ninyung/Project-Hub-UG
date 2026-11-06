@@ -151,7 +151,6 @@ export default function ProfilePage() {
         <ProjectGrid
           projects={list}
           isLoading={false}
-          className="xl:grid-cols-2 2xl:grid-cols-3"
           empty={
             tab === 'projects'
               ? {

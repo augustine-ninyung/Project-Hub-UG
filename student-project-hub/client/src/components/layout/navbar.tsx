@@ -1,5 +1,5 @@
 import { LogOut, Menu, Moon, Plus, Search, Settings, Shield, Sun, User } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,20 @@ export function SearchBar({ className }: { className?: string }) {
   const location = useLocation();
   const [params] = useSearchParams();
   const [value, setValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Ctrl/Cmd+K focuses search from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Mirror the explore page's search term when on that page.
   useEffect(() => {
@@ -42,16 +56,20 @@ export function SearchBar({ className }: { className?: string }) {
       <label htmlFor="global-search" className="sr-only">
         Search projects
       </label>
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="group relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground" />
         <input
+          ref={inputRef}
           id="global-search"
           type="search"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Search projects…"
-          className="h-9 w-full rounded-md border border-input bg-card pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          className="h-9 w-full rounded-md border border-input bg-card pl-9 pr-14 text-sm shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground hover:border-foreground/20 focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         />
+        <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground transition-opacity group-focus-within:opacity-0 md:block">
+          Ctrl K
+        </kbd>
       </div>
     </form>
   );
@@ -101,16 +119,17 @@ export function Navbar({ onOpenMenu }: { onOpenMenu: () => void }) {
 
         {isAuthenticated && user ? (
           <>
-            <Button asChild size="sm" className="mx-1 hidden md:inline-flex">
-              <Link to="/projects/new">
-                <Plus /> Upload
+            <Button asChild size="sm" className="mx-1 max-sm:size-9 max-sm:px-0">
+              <Link to="/projects/new" aria-label="Upload a project">
+                <Plus />
+                <span className="max-sm:sr-only">Upload</span>
               </Link>
             </Button>
             <NotificationDropdown />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="ml-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="ml-1 rounded-full ring-offset-2 ring-offset-background transition-shadow duration-150 hover:ring-2 hover:ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:ring-2 data-[state=open]:ring-ring/50"
                   aria-label="Account menu"
                 >
                   <UserAvatar user={user} size="sm" />

@@ -7,7 +7,8 @@ import type { ProjectDetail } from '@/types/api';
 export const projectKeys = {
   all: ['projects'] as const,
   list: (filters: ProjectFilters) => ['projects', 'list', filters] as const,
-  section: (name: string) => ['projects', name] as const,
+  /** Includes the size, so pages asking for different counts don't share a cache entry. */
+  section: (name: string, limit: number) => ['projects', name, limit] as const,
   detail: (id: string) => ['project', id] as const,
   related: (id: string) => ['project', id, 'related'] as const,
   comments: (id: string) => ['project', id, 'comments'] as const,
@@ -22,16 +23,16 @@ export function useProjects(filters: ProjectFilters) {
 }
 
 export function useTrendingProjects(limit = 6) {
-  return useQuery({ queryKey: projectKeys.section('trending'), queryFn: () => projectService.trending(limit) });
+  return useQuery({ queryKey: projectKeys.section('trending', limit), queryFn: () => projectService.trending(limit) });
 }
 
 export function useFeaturedProjects(limit = 6) {
-  return useQuery({ queryKey: projectKeys.section('featured'), queryFn: () => projectService.featured(limit) });
+  return useQuery({ queryKey: projectKeys.section('featured', limit), queryFn: () => projectService.featured(limit) });
 }
 
 export function useRecommendedProjects(limit = 6) {
   return useQuery({
-    queryKey: projectKeys.section('recommended'),
+    queryKey: projectKeys.section('recommended', limit),
     queryFn: () => projectService.recommended(limit),
   });
 }

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { NavLink, Route, Routes } from 'react-router-dom';
 import { PageHeader } from '@/components/common/section';
 import { useAuth } from '@/context/auth-context';
 import { AdminCategories, AdminProjects, AdminReports, AdminUsers } from '@/features/admin/management';
@@ -11,7 +11,6 @@ import { cn } from '@/utils/cn';
 export default function AdminPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const location = useLocation();
   const stats = useQuery({ queryKey: ['admin', 'statistics'], queryFn: adminService.statistics });
   const t = stats.data?.totals;
 
@@ -31,9 +30,6 @@ export default function AdminPage() {
     { to: '/admin/categories', label: 'Categories' },
   ];
 
-  // Re-animate on tab change only, not when filters in the query string change.
-  const section = location.pathname.replace(/\/+$/, '');
-
   return (
     <div>
       <PageHeader title="Admin dashboard" description="Monitor the platform and keep the community healthy." />
@@ -45,7 +41,7 @@ export default function AdminPage() {
             end={tab.end}
             className={({ isActive }) =>
               cn(
-                '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+                '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors duration-200',
                 isActive ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
               )
             }
@@ -53,8 +49,9 @@ export default function AdminPage() {
             {tab.label}
             {!!tab.count && (
               <span
+                key={tab.count}
                 className={cn(
-                  'min-w-5 rounded-full px-1.5 py-px text-center text-[11px] font-semibold tabular-nums animate-scale-in',
+                  'min-w-5 animate-pop rounded-full px-1.5 py-px text-center text-[11px] font-semibold tabular-nums',
                   tab.urgent ? 'bg-destructive text-white' : 'bg-warning/20 text-warning',
                 )}
                 aria-label={`${tab.count} ${tab.hint}`}
@@ -66,15 +63,14 @@ export default function AdminPage() {
           </NavLink>
         ))}
       </nav>
-      <div key={section} className="animate-fade-in">
-        <Routes>
-          <Route index element={<AdminOverview />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="projects" element={<AdminProjects />} />
-          <Route path="reports" element={<AdminReports />} />
-          <Route path="categories" element={<AdminCategories />} />
-        </Routes>
-      </div>
+      {/* Tab changes animate through the app layout's page transition. */}
+      <Routes>
+        <Route index element={<AdminOverview />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="projects" element={<AdminProjects />} />
+        <Route path="reports" element={<AdminReports />} />
+        <Route path="categories" element={<AdminCategories />} />
+      </Routes>
     </div>
   );
 }

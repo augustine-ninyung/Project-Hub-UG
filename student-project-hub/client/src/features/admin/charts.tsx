@@ -38,15 +38,16 @@ export function DailyBarChart({
               onMouseLeave={() => setActive(null)}
             >
               <div
-                className="w-full rounded-t-[4px] bg-primary transition-opacity"
+                className="w-full origin-bottom animate-grow-y rounded-t-[4px] bg-primary transition-[opacity,height] duration-300"
                 style={{
                   height: `${(d.value / max) * 100}%`,
                   minHeight: d.value ? 2 : 0,
                   opacity: active === null || active === i ? 1 : 0.45,
+                  animationDelay: `${i * 25}ms`,
                 }}
               />
               {active === i && (
-                <div className="absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs shadow-md">
+                <div className="absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 animate-scale-in whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs shadow-md">
                   <span className="text-muted-foreground">{format(new Date(d.date), 'MMM d')}: </span>
                   <span className="font-semibold tabular-nums">{d.value}</span>
                 </div>
@@ -86,13 +87,13 @@ export function HorizontalBars({ data }: { data: { name: string; count: number }
   const max = Math.max(1, ...sorted.map((d) => d.count));
   return (
     <ul className="space-y-2.5">
-      {sorted.map((d) => (
+      {sorted.map((d, i) => (
         <li key={d.name} className="grid grid-cols-[minmax(0,9rem)_1fr_2rem] items-center gap-3 text-sm">
           <span className="truncate text-muted-foreground">{d.name}</span>
           <span className="h-2 overflow-hidden rounded-r-[4px] bg-muted" aria-hidden>
             <span
-              className="block h-full rounded-r-[4px] bg-primary"
-              style={{ width: `${(d.count / max) * 100}%` }}
+              className="block h-full origin-left animate-grow-x rounded-r-[4px] bg-primary transition-[width] duration-300"
+              style={{ width: `${(d.count / max) * 100}%`, animationDelay: `${i * 40}ms` }}
             />
           </span>
           <span className="text-right font-medium tabular-nums">{d.count}</span>

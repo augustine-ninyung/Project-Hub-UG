@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/form-controls';
 import { Card, Skeleton } from '@/components/ui/misc';
 import { getErrorMessage } from '@/services/api';
 import { cn } from '@/utils/cn';
+import { isTypingTarget } from '@/utils/keyboard';
 
 /**
  * Filters, search and page live in the address bar, so a refresh, a shared
@@ -57,9 +58,7 @@ export function SearchInput({ placeholder }: { placeholder: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing = target?.closest('input, textarea, select, [contenteditable="true"]');
-      if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.key === '/' && !isTypingTarget(e.target) && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         ref.current?.focus();
       }
@@ -113,7 +112,7 @@ export function Table({
             ))}
           </tr>
         </thead>
-        <tbody className={cn('divide-y transition-opacity duration-200', busy && 'opacity-55')}>{children}</tbody>
+        <tbody className={cn('divide-y transition-opacity duration-200 [&_td]:whitespace-nowrap', busy && 'opacity-55')}>{children}</tbody>
       </table>
     </Card>
   );

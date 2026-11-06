@@ -1,10 +1,11 @@
-import { Moon, Plus, Sparkles, Sun, Sunrise, UserPlus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Bell, FolderGit2, Heart, Moon, Plus, Sparkles, Sun, Sunrise, UserPlus, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Section } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/misc';
 import { useAuth } from '@/context/auth-context';
-import { useInvitations, useRespondToInvitation } from '@/features/notifications/hooks';
+import { useInvitations, useRespondToInvitation, useUnreadCount } from '@/features/notifications/hooks';
 import {
   useCategories,
   useFeaturedProjects,
@@ -15,6 +16,9 @@ import {
 import { ProjectGrid } from '@/features/projects/project-grid';
 import { TrendingList } from '@/features/projects/trending-list';
 import { ActiveStudents } from '@/features/users/active-students';
+import { userService } from '@/services/user.service';
+import { cn } from '@/utils/cn';
+import { compactNumber } from '@/utils/format';
 
 function greeting() {
   const h = new Date().getHours();
@@ -23,32 +27,74 @@ function greeting() {
   return { text: 'Good evening', Icon: Moon };
 }
 
+function QuickStat({
+  to,
+  icon: Icon,
+  label,
+  value,
+  highlight = false,
+}: {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  value: number | undefined;
+  highlight?: boolean;
+}) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        'group flex min-w-0 items-center gap-3 rounded-lg border bg-card px-3.5 py-2.5 shadow-xs transition-[border-color,box-shadow,transform] duration-200 ease-smooth hover:-translate-y-px hover:border-foreground/15 hover:shadow-sm',
+        highlight && 'border-primary/30 bg-primary/[0.04]',
+      )}
+    >
+      <span
+        className={cn(
+          'hidden size-8 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground transition-colors group-hover:text-foreground sm:flex',
+          highlight && 'bg-primary/10 text-primary group-hover:text-primary',
+        )}
+      >
+        <Icon className="size-4" aria-hidden />
+      </span>
+      <span className="min-w-0 leading-tight">
+        <span className="block text-lg font-semibold tabular-nums">
+          {value === undefined ? <span className="text-muted-foreground">–</span> : compactNumber(value)}
+        </span>
+        <span className="block text-xs text-muted-foreground sm:truncate">{label}</span>
+      </span>
+    </Link>
+  );
+}
+
 function Welcome() {
   const { user } = useAuth();
+  const unread = useUnreadCount();
+  const profile = useQuery({
+    queryKey: ['profile', user?.username],
+    queryFn: () => userService.profile(user!.username),
+    enabled: !!user,
+  });
 
   // Signed-out visitors get the landing page at "/" instead of this dashboard.
   if (!user) return null;
   const { text, Icon } = greeting();
+  const stats = profile.data?.stats;
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Icon className="size-4 text-brand" aria-hidden />
           {text},
         </p>
-        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">
-          {user.fullName.split(' ')[0]}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          See what the community has been building this week.
-        </p>
+        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">{user.fullName.split(' ')[0]}</h1>
+        <p className="mt-1 text-muted-foreground">See what the community has been building this week.</p>
       </div>
-      <Button asChild size="lg">
-        <Link to="/projects/new">
-          <Plus /> Share a project
-        </Link>
-      </Button>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:w-auto">
+        <QuickStat to={`/u/${user.username}`} icon={FolderGit2} label="Your projects" value={stats?.projects} />
+        <QuickStat to={`/u/${user.username}`} icon={Heart} label="Likes received" value={stats?.likesReceived} />
+        <QuickStat to="/notifications" icon={Bell} label="Unread" value={unread} highlight={unread > 0} />
+      </div>
     </div>
   );
 }
@@ -100,10 +146,10 @@ function PendingInvitations() {
 
 export default function HomePage() {
   const { isAuthenticated } = useAuth();
-  const featured = useFeaturedProjects(3);
+  const featured = useFeaturedProjects(6);
   const recent = useProjects({ sort: 'newest', limit: 6 });
   const trending = useTrendingProjects(5);
-  const recommended = useRecommendedProjects(3);
+  const recommended = useRecommendedProjects(4);
   const categories = useCategories();
 
   return (
@@ -120,6 +166,7 @@ export default function HomePage() {
                 isLoading={featured.isLoading}
                 error={featured.error}
                 skeletonCount={3}
+                layout="row"
               />
             </Section>
           )}
@@ -154,27 +201,27 @@ export default function HomePage() {
               projects={recommended.data}
               isLoading={recommended.isLoading}
               error={recommended.error}
-              skeletonCount={3}
+              skeletonCount={4}
             />
           </Section>
         </div>
 
         <aside className="space-y-6">
           <Card className="p-5">
-            <h2 className="mb-3 flex items-center gap-2 font-semibold">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <Sparkles className="size-4 text-primary" /> Trending this week
             </h2>
             <TrendingList projects={trending.data} isLoading={trending.isLoading} />
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-3 font-semibold">Browse categories</h2>
+            <h2 className="mb-3 text-sm font-semibold">Browse categories</h2>
             <div className="flex flex-wrap gap-2">
               {categories.data?.map((c) => (
                 <Link
                   key={c.id}
                   to={`/explore?category=${c.slug}`}
-                  className="rounded-full border px-3 py-1 text-sm transition-colors hover:border-primary hover:text-primary"
+                  className="rounded-full border px-3 py-1 text-sm transition-colors duration-150 hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
                 >
                   {c.name}
                 </Link>
@@ -183,7 +230,7 @@ export default function HomePage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-4 font-semibold">Recently active students</h2>
+            <h2 className="mb-4 text-sm font-semibold">Recently active students</h2>
             <ActiveStudents />
           </Card>
         </aside>
