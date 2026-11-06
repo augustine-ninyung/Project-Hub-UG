@@ -154,6 +154,7 @@ student-project-hub/
 | `PORT` | | `4000` | Local HTTP port |
 | `DATABASE_URL` | ✅ | | PostgreSQL connection string. On Vercel: Supabase **transaction pooler** + `?pgbouncer=true&connection_limit=1` |
 | `DIRECT_URL` | ✅ on Vercel | | Supabase **session pooler** string. Used only to run migrations during production builds |
+| `DATABASE_SCHEMA` | Previews only | `preview` | Postgres schema to use instead of `public`. Required on Vercel preview deployments, and must not be `public` |
 | `JWT_ACCESS_SECRET` | ✅ | | ≥ 32 random characters; signs access tokens and derives private live-update topics |
 | `ACCESS_TOKEN_TTL_MINUTES` | | `15` | Access-token lifetime |
 | `REFRESH_TOKEN_TTL_DAYS` | | `30` | Session (refresh-token) lifetime |
@@ -373,6 +374,16 @@ SQL (in **Supabase → SQL Editor**, keeping the double quotes around names) is 
 ```sql
 UPDATE "User" SET role = 'ADMIN' WHERE email = 'person@example.com';
 ```
+
+**Trying changes on a preview first.** Pushing to `main` publishes straight to the live site, so test changes on a branch first:
+
+1. Push the work to a branch other than `main`. Vercel builds a private preview of it (only people logged in to your Vercel team can open it) and shows the link on the deployment and on GitHub.
+2. Check the preview. It uses its own `preview` schema in the same Supabase database, its own `project-hub-preview` image bucket and its own session secret, so nothing done there touches live users, projects or images, and live logins don't work on it. Database migrations from the branch are applied to the `preview` schema on each preview build.
+3. When it looks right, merge the branch into `main` to publish.
+
+One-time setup: from `student-project-hub/`, run `node scripts/setup-preview-env.mjs` while logged in to the Vercel CLI. It copies the Production settings to the Preview environment, sets `DATABASE_SCHEMA=preview` and a new `JWT_ACCESS_SECRET`, and creates the preview bucket. Secrets go straight from Vercel back to Vercel and are never printed. As a safety net, both the build and the server refuse to run a preview without a non-`public` `DATABASE_SCHEMA`.
+
+Previews still share the Supabase project with the live site: live-update pings on the public project feed reach both (harmless, they carry no data), and preview emails go through the same Resend account.
 
 **Logs.** Use Vercel → your project → **Logs**, or `npx vercel logs -e production` from the project folder. On the free (Hobby) plan, runtime logs are kept for only about **30 minutes**, so reproduce a problem and read the logs right away.
 

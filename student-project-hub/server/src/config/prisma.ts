@@ -33,6 +33,12 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 // handled by services, and unexpected ones are logged by the error handler.
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({ adapter: new PrismaPg(poolConfig(env.DATABASE_URL)), log: ['warn'] });
+  new PrismaClient({
+    adapter: new PrismaPg(
+      poolConfig(env.DATABASE_URL),
+      env.DATABASE_SCHEMA ? { schema: env.DATABASE_SCHEMA } : undefined,
+    ),
+    log: ['warn'],
+  });
 
 if (!isProduction) globalForPrisma.prisma = prisma;

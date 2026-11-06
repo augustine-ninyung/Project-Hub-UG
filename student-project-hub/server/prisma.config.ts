@@ -8,6 +8,16 @@ try {
   // No .env file (CI, Vercel): use the environment as is.
 }
 
+/** Migrations and seeding target DATABASE_SCHEMA when set (preview deployments). */
+function datasourceUrl() {
+  const raw = process.env.DATABASE_URL;
+  const schema = process.env.DATABASE_SCHEMA;
+  if (!raw || !schema) return raw ?? '';
+  const url = new URL(raw);
+  url.searchParams.set('schema', schema);
+  return url.toString();
+}
+
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
@@ -17,6 +27,6 @@ export default defineConfig({
   datasource: {
     // Not needed by `prisma generate`, so a missing value only fails commands
     // that actually connect (migrate, db seed).
-    url: process.env.DATABASE_URL ?? '',
+    url: datasourceUrl(),
   },
 });

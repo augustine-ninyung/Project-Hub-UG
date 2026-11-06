@@ -17,6 +17,17 @@ const envSchema = z.object({
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  /**
+   * Postgres schema to use instead of "public". Preview deployments set it
+   * ("preview") so they share the database server but never the live tables.
+   */
+  DATABASE_SCHEMA: z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .regex(/^[a-z_][a-z0-9_]{0,62}$/, 'DATABASE_SCHEMA must be a lowercase identifier')
+      .optional(),
+  ),
 
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
@@ -41,11 +52,15 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().default('Student Project Hub <no-reply@example.com>'),
 });
 
-// On Vercel the client and API share one origin, so the production URL that
-// Vercel provides is a sensible default for the URL settings.
-const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-  : undefined;
+// On Vercel the client and API share one origin, so the deployment's own URL
+// is a sensible default for the URL settings: the production domain on
+// production, and the branch (or deployment) URL on previews, so links in
+// emails and CORS point at the preview itself.
+const isPreview = process.env.VERCEL_ENV === 'preview';
+const vercelHost = isPreview
+  ? (process.env.VERCEL_BRANCH_URL ?? process.env.VERCEL_URL)
+  : process.env.VERCEL_PROJECT_PRODUCTION_URL;
+const vercelUrl = vercelHost ? `https://${vercelHost}` : undefined;
 const source: Record<string, string | undefined> = { ...process.env };
 if (vercelUrl) {
   for (const key of ['CLIENT_URL', 'CORS_ORIGINS', 'API_URL']) {
@@ -60,6 +75,12 @@ if (!parsed.success) {
   for (const issue of parsed.error.issues) {
     console.error(`  ${issue.path.join('.')}: ${issue.message}`);
   }
+  process.exit(1);
+}
+
+// A preview must never run against the live tables.
+if (isPreview && (!parsed.data.DATABASE_SCHEMA || parsed.data.DATABASE_SCHEMA === 'public')) {
+  console.error('Preview deployments need DATABASE_SCHEMA set to a schema other than "public".');
   process.exit(1);
 }
 
