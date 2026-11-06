@@ -18,5 +18,7 @@ if (!window.matchMedia) {
       dispatchEvent: () => false,
     }) as MediaQueryList;
 }
-URL.createObjectURL ??= () => 'blob:preview';
-URL.revokeObjectURL ??= () => {};
+// Always stubbed: jsdom's own version only accepts jsdom Blobs, but under
+// Vitest 4 test files are Node's File objects. Previews don't render here anyway.
+URL.createObjectURL = () => 'blob:preview';
+URL.revokeObjectURL = () => {};
