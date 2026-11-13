@@ -30,7 +30,7 @@ export default function AdminPage() {
       label: 'Students',
       badges: [
         { count: t?.deletionRequests, hint: 'asked to be deleted', urgent: true },
-        { count: t?.unverifiedUsers, hint: 'unverified' },
+        { count: t?.awaitingApproval, hint: 'waiting for approval', urgent: true },
       ],
     },
     { to: '/admin/projects', label: 'Projects' },

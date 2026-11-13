@@ -54,12 +54,27 @@ export async function sendVerificationEmail(to: string, name: string, token: str
   const url = `${env.CLIENT_URL}/verify-email?token=${token}`;
   await send({
     to,
-    subject: 'Verify your email — Student Project Hub',
-    text: `Hi ${name}, confirm your email address: ${url}`,
+    subject: 'Confirm your email — Student Project Hub',
+    text: `Hi ${name}, confirm your email address: ${url} (expires in 24 hours)`,
     html: layout(
       `Welcome, ${escapeHtml(name)}!`,
-      'Confirm your email address to start sharing projects with the community. This link expires in 24 hours.',
-      'Verify email',
+      'Confirm your email address to finish creating your account. After that, an admin will approve you so you can start sharing projects. This link expires in 24 hours.',
+      'Confirm email',
+      url,
+    ),
+  });
+}
+
+export async function sendAccountApprovedEmail(to: string, name: string) {
+  const url = `${env.CLIENT_URL}/projects/new`;
+  await send({
+    to,
+    subject: 'Your account is approved — Student Project Hub',
+    text: `Hi ${name}, an admin approved your account. You can now upload projects: ${url}`,
+    html: layout(
+      'You are approved!',
+      `Hi ${escapeHtml(name)}, an admin approved your account. You can now upload projects, comment and collaborate with other students.`,
+      'Upload a project',
       url,
     ),
   });

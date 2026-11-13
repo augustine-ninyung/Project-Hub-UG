@@ -14,21 +14,21 @@ const validRegistration = {
 };
 
 describe('POST /auth/register', () => {
-  it('creates an account, hashes the password and starts a session', async () => {
+  it('creates an account and hashes the password, without signing in yet', async () => {
     const agent = client();
     const res = await agent.post('/api/v1/auth/register').send(validRegistration);
 
     expect(res.status).toBe(201);
-    expect(res.body.data.user).toMatchObject({ username: 'ama_codes', emailVerified: false });
-    expect(res.body.data.user.passwordHash).toBeUndefined();
-    expect(String(res.headers['set-cookie'])).toMatch(/access_token=.*HttpOnly/);
+    expect(res.body.data).toMatchObject({ email: 'ama@example.edu' });
+    expect(res.body.data.user).toBeUndefined();
+    // No session until the email is confirmed.
+    expect(res.headers['set-cookie']).toBeUndefined();
+    expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
 
     const stored = await prisma.user.findUniqueOrThrow({ where: { email: 'ama@example.edu' } });
     expect(stored.passwordHash).toMatch(/^\$argon2id\$/);
-
-    const me = await agent.get('/api/v1/auth/me');
-    expect(me.status).toBe(200);
-    expect(me.body.data.user.email).toBe('ama@example.edu');
+    expect(stored.emailVerifiedAt).toBeNull();
+    expect(stored.approvedAt).toBeNull();
   });
 
   it('rejects invalid input with field-level errors', async () => {
@@ -62,6 +62,7 @@ describe('POST /auth/register', () => {
 describe('POST /auth/login', () => {
   it('logs in with email or username', async () => {
     await client().post('/api/v1/auth/register').send(validRegistration);
+    await prisma.user.update({ where: { email: 'ama@example.edu' }, data: { emailVerifiedAt: new Date() } });
 
     const byEmail = await client()
       .post('/api/v1/auth/login')

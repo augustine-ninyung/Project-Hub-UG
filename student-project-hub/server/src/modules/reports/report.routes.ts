@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/prisma.js';
-import { requireAuth, requireVerified } from '../../middleware/auth.js';
+import { requireAuth, requireApproved } from '../../middleware/auth.js';
 import { writeLimiter } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { ApiError } from '../../utils/api-error.js';
@@ -30,7 +30,7 @@ export const reportRouter = Router();
 reportRouter.post(
   '/',
   requireAuth,
-  requireVerified,
+  requireApproved,
   writeLimiter,
   validate({ body: createReportSchema }),
   async (req: Request, res: Response) => {

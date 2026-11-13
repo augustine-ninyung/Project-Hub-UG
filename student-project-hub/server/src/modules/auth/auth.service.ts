@@ -70,7 +70,12 @@ async function consumeAuthToken(token: string, type: AuthTokenType) {
   return record.userId;
 }
 
-export async function register(input: RegisterInput, ctx: SessionContext) {
+/**
+ * Creates the account and emails a confirmation link. No session is issued:
+ * the student signs in after confirming, then waits for an admin's approval
+ * before they can upload.
+ */
+export async function register(input: RegisterInput) {
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { username: input.username }] },
     select: { email: true },
@@ -99,7 +104,7 @@ export async function register(input: RegisterInput, ctx: SessionContext) {
   await sendVerificationEmail(user.email, user.fullName, token);
   queueTopic(adminTopic()); // a new student appears on admin dashboards
 
-  return { user: toSelfUser(user), session: await createSession(user.id, ctx) };
+  return { email: user.email };
 }
 
 export async function login(input: LoginInput, ctx: SessionContext) {
@@ -115,6 +120,14 @@ export async function login(input: LoginInput, ctx: SessionContext) {
   if (!user || !valid) throw ApiError.unauthorized('Invalid email/username or password');
   if (user.status === 'SUSPENDED') {
     throw new ApiError(403, 'This account has been suspended', 'ACCOUNT_SUSPENDED');
+  }
+  // Only reached with the right password, so this reveals nothing to others.
+  if (!user.emailVerifiedAt) {
+    throw new ApiError(
+      403,
+      `Confirm your email first. We sent a link to ${user.email}.`,
+      'EMAIL_NOT_VERIFIED',
+    );
   }
   // Only reached with the right password, so this reveals nothing to others.
   if (user.deletionRequestedAt && !input.cancelDeletion) {
@@ -142,7 +155,7 @@ export async function refresh(refreshToken: string | undefined, ctx: SessionCont
 
   const session = await prisma.userSession.findUnique({
     where: { refreshTokenHash: hashToken(refreshToken) },
-    include: { user: { select: { status: true, deletionRequestedAt: true } } },
+    include: { user: { select: { status: true, deletionRequestedAt: true, emailVerifiedAt: true } } },
   });
   if (!session) throw ApiError.unauthorized('Session expired');
 
@@ -160,7 +173,8 @@ export async function refresh(refreshToken: string | undefined, ctx: SessionCont
   if (
     session.expiresAt < new Date() ||
     session.user.status === 'SUSPENDED' ||
-    session.user.deletionRequestedAt
+    session.user.deletionRequestedAt ||
+    !session.user.emailVerifiedAt
   ) {
     throw ApiError.unauthorized('Session expired');
   }
@@ -188,12 +202,19 @@ export async function verifyEmail(token: string) {
     where: { id: userId },
     data: { emailVerifiedAt: new Date() },
   });
+  queueTopic(adminTopic()); // now waiting for an admin's approval
   return toSelfUser(user);
 }
 
-export async function resendVerification(userId: string) {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  if (user.emailVerifiedAt) throw ApiError.badRequest('Email is already verified');
+/**
+ * Sends a fresh confirmation link. Answers the same way whether or not the
+ * address has an account, so it can't be used to find out who signed up.
+ */
+export async function resendVerification(identifier: string) {
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ email: identifier }, { username: identifier }] },
+  });
+  if (!user || user.emailVerifiedAt || user.status === 'SUSPENDED' || user.deletionRequestedAt) return;
   const token = await issueAuthToken(user.id, 'EMAIL_VERIFICATION', VERIFICATION_TTL_MS);
   await sendVerificationEmail(user.email, user.fullName, token);
 }

@@ -12,7 +12,7 @@ ProjectHub is a community platform where students showcase what they build, disc
 - Live updates: likes, comments, new projects and notifications appear without a refresh
 - Rich link previews when a project is shared on WhatsApp, LinkedIn, X, Slack and others
 - Contributor invitations, student profiles, light and dark mode, fully responsive
-- Email verification, password reset, and an admin dashboard for moderation
+- Sign-up with email confirmation and admin approval, password reset, and an admin dashboard for moderation
 
 | | |
 |---|---|
@@ -21,7 +21,7 @@ ProjectHub is a community platform where students showcase what they build, disc
 | **Auth** | Argon2id passwords, short-lived JWT access cookie + rotating refresh token (httpOnly cookies), email verification, password reset, role-based access |
 | **Hosting** | One Vercel project (website + API as a serverless function) |
 | **Supabase** | PostgreSQL database, Storage (images), Realtime (live updates) |
-| **Email** | Any SMTP provider (production uses Resend) |
+| **Email** | Any SMTP provider (Gmail with an app password, or Resend with a verified domain) |
 | **Tests** | Vitest + Supertest against a real PostgreSQL (server), Vitest + Testing Library (client) |
 
 ---
@@ -173,7 +173,7 @@ student-project-hub/
 | `SMTP_HOST` | ✅ in prod | | SMTP server. Empty in development = emails are printed to the console |
 | `SMTP_PORT` / `SMTP_SECURE` | | `587` / `false` | SMTP connection settings |
 | `SMTP_USER` / `SMTP_PASS` | | | SMTP credentials |
-| `EMAIL_FROM` | ✅ in prod | `Student Project Hub <no-reply@example.com>` | Sender. Must be an address/domain your provider has verified (never a Gmail/Outlook address with Resend) |
+| `EMAIL_FROM` | ✅ in prod | `Student Project Hub <no-reply@example.com>` | Sender. With Gmail, the same Gmail address as `SMTP_USER`; with Resend, an address on a domain you verified there |
 
 The server validates its environment at startup and exits with a clear message if anything is missing or malformed. In production it refuses to start without the Supabase URL and service key, `SMTP_HOST` and `EMAIL_FROM`.
 
@@ -219,31 +219,32 @@ npm test -w client    # component tests
 npm run typecheck     # TypeScript, both apps
 ```
 
-**Server (81 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
+**Server (86 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
 
 | File | Covers |
 |---|---|
+| `approval.test.ts` | the whole sign-up journey with the real email links: no session at sign-up, no sign-in before confirming, no approval before confirming, browsing but not uploading while waiting, the admin queue and count, approval email and notification, works on the current session; resending the link by email or username without revealing who has an account; admins never need approval |
 | `auth.test.ts` | registration, hashing, duplicates, login by email/username, generic errors, suspended accounts, refresh-token rotation and replay, logout, CSRF, email verification, password reset |
-| `projects.test.ts` | create with images, auth and verified-email rules, validation, fake-image rejection, contributor invites, private-project access, owner/admin-only edit and delete, search/filter/sort/pagination, trending and featured |
+| `projects.test.ts` | create with images, auth and approval rules, validation, fake-image rejection, contributor invites, private-project access, owner/admin-only edit and delete, search/filter/sort/pagination, trending and featured |
 | `engagement.test.ts` | idempotent likes and counts, notifications, clearing only your own notifications, threaded comments, author-only edit, soft delete, reports |
 | `backup.test.ts` | the daily job runs only with the cron secret and is off without one; backups hold every table except sessions and tokens; 30-day clean-up; a full wipe-and-restore brings everything back (replies still linked, old passwords still work), including into a freshly migrated database; restore refuses a database with data |
 | `account-deletion.test.ts` | deletion requests need the password, end every session and hide the profile; sign-in reports the pending request only after a correct password and can withdraw it; admins delete for good (with projects) or keep the account; suspended accounts can be deleted without a request, active ones that didn't ask never; admin-only |
-| `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, manual email verification (admin-only, one-time, unlocks posting at once, notifies the student), unverified count |
+| `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, confirming a student's email by hand (admin-only, one-time, lets them sign in but not post until approved) |
 | `meta.test.ts` | public stats count only public projects and active students |
 | `rate-limit-store.test.ts` | database-backed rate-limit counters: windows, sharing across instances, concurrency |
 | `realtime.test.ts` | live-update pings for likes, replies and project changes; nothing sent for failed requests; unguessable user topics; the admin topic (admins only; pinged on sign-ups, reports and admin actions) |
 | `share.test.ts` | link-preview tags for public projects, HTML escaping, private projects never described, 1200×630 preview image, fallback image |
 
-**Client (28 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, the live-update hook (subscribe, debounce, disabled when not configured), and the admin Students tab (instant verify with rollback, confirmation before granting admin, bulk verify, details panel, typing the username before permanent deletion, deleting suspended accounts), and keeping an account that is waiting to be deleted at sign-in.
+**Client (32 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, the live-update hook (subscribe, debounce, disabled when not configured), the sign-up screens (check-your-email panel, new link from sign-in, waiting-for-approval upload page), and the admin Students tab (instant approval with rollback, no approval before the email is confirmed, confirmation before granting admin, bulk approve, details panel, typing the username before permanent deletion, deleting suspended accounts), and keeping an account that is waiting to be deleted at sign-in.
 
 ---
 
 ## API reference
 
-Base path: `/api/v1`. 🔒 session required · ✉️ verified email required · 🛡️ admin only.
+Base path: `/api/v1`. 🔒 session required (only possible after confirming the email) · ✉️ approved account required (admins always are) · 🛡️ admin only.
 
 **Auth:**
-`POST /auth/register` · `POST /auth/login` (`{ identifier, password, cancelDeletion? }`) · `POST /auth/logout` · `POST /auth/refresh` · `GET /auth/me` 🔒 · `POST /auth/verify-email` · `POST /auth/resend-verification` 🔒 · `POST /auth/forgot-password` · `POST /auth/reset-password`
+`POST /auth/register` (creates the account and emails a link; no session) · `POST /auth/login` (`{ identifier, password, cancelDeletion? }`) · `POST /auth/logout` · `POST /auth/refresh` · `GET /auth/me` 🔒 · `POST /auth/verify-email` · `POST /auth/resend-verification` (`{ identifier }`, email or username; same answer either way) · `POST /auth/forgot-password` · `POST /auth/reset-password`
 
 **Users:**
 `GET /users/me` 🔒 · `PATCH /users/me` 🔒 · `POST /users/me/avatar` 🔒 (multipart `avatar`) · `DELETE /users/me/avatar` 🔒 · `GET /users/me/invitations` 🔒 · `POST /users/me/deletion-request` 🔒 (`{ password, reason? }`) · `GET /users/:idOrUsername` · `GET /users?search=` 🔒 · `GET /users/active`
@@ -269,7 +270,7 @@ Base path: `/api/v1`. 🔒 session required · ✉️ verified email required ·
 `GET /categories` · `GET /technologies?search=` · `GET /stats` (public totals for the landing page) · `GET /realtime` (live-update settings for the browser, or `null` when off)
 
 **Admin** 🛡️:
-`GET /admin/statistics` · `GET /admin/activity` · `GET /admin/users?search=&role=&status=&verified=&deletion=requested` · `PATCH /admin/users/:id` (`{ role?, status? }`) · `POST /admin/users/:id/verify-email` · `DELETE /admin/users/:id` (only if the owner asked or the account is suspended) · `POST /admin/users/:id/keep` · `GET /admin/projects` · `PATCH /admin/projects/:id/feature` · `DELETE /admin/projects/:id` · `GET /admin/reports?status=` · `PATCH /admin/reports/:id` (`{ status, resolutionNote?, removeContent? }`) · `POST/PATCH/DELETE /admin/categories[/:id]`
+`GET /admin/statistics` · `GET /admin/activity` · `GET /admin/users?search=&role=&status=&verified=&deletion=requested&approval=pending` · `PATCH /admin/users/:id` (`{ role?, status? }`) · `POST /admin/users/:id/verify-email` · `POST /admin/users/:id/approve` (only after the email is confirmed) · `DELETE /admin/users/:id` (only if the owner asked or the account is suspended) · `POST /admin/users/:id/keep` · `GET /admin/projects` · `PATCH /admin/projects/:id/feature` · `DELETE /admin/projects/:id` · `GET /admin/reports?status=` · `PATCH /admin/reports/:id` (`{ status, resolutionNote?, removeContent? }`) · `POST/PATCH/DELETE /admin/categories[/:id]`
 
 **Outside `/api/v1`:**
 `GET /health` · `GET /projects/:id` (link-preview HTML, only for social crawlers on Vercel) · `GET /og/projects/:id.jpg` (1200×630 preview image)
@@ -322,13 +323,19 @@ The whole app is **one Vercel project**: Vercel serves the built website and run
    - **Transaction pooler** (port `6543`) → `DATABASE_URL`, with `?pgbouncer=true&connection_limit=1` appended.
    - **Session pooler** (port `5432`) → `DIRECT_URL` (migrations only).
 
-### 2. Email (Resend)
+### 2. Email
 
-Supabase doesn't send email for your app. With [Resend](https://resend.com):
+Supabase doesn't send email for your app. Students need these emails to confirm their address, so pick a provider that can reach everyone.
 
-1. Create an API key with **Sending access**.
-2. Use `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`, `SMTP_USER=resend`, `SMTP_PASS=<the API key>`.
-3. **Sender:** until you verify a domain, use `EMAIL_FROM="ProjectHub <onboarding@resend.dev>"`. With that test sender, Resend only delivers to **your own Resend account's email**. To email everyone, add and verify a domain you own under *Domains* in Resend, then set `EMAIL_FROM` to an address on it (for example `ProjectHub <no-reply@yourdomain.com>`). A Gmail or Outlook address can never be the sender.
+**Option A: a Gmail account (simplest).** Best with a separate Gmail made just for the site, so your personal inbox stays private and safe if someone spams the sign-up form. Gmail allows about 500 emails a day.
+
+1. In that Google account, turn on **2-Step Verification** (*Google Account → Security*).
+2. Create an **app password** (*Google Account → Security → App passwords*, or search "App passwords"). Google shows 16 letters once; copy them.
+3. Use `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=<the Gmail address>`, `SMTP_PASS=<the app password, no spaces>`, `EMAIL_FROM="ProjectHub <the same Gmail address>"`.
+
+Your normal Gmail password never goes into the site. To stop the site sending, delete the app password in Google.
+
+**Option B: [Resend](https://resend.com) with your own domain.** Create an API key with **Sending access** and use `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`, `SMTP_USER=resend`, `SMTP_PASS=<the API key>`. Resend's test sender `onboarding@resend.dev` only delivers to your own Resend account's email, so add and verify a domain you own under *Domains*, then set `EMAIL_FROM` to an address on it (for example `ProjectHub <no-reply@yourdomain.com>`).
 
 ### 3. Vercel
 
@@ -353,7 +360,7 @@ Supabase doesn't send email for your app. With [Resend](https://resend.com):
 **Check after a deploy:**
 
 1. `https://<your-app>.vercel.app/health` shows `{"status":"ok"}`.
-2. Sign up, verify the email, and upload a project with images.
+2. Sign up with a second email address, click the link in the confirmation email, sign in, approve yourself from another admin account (Admin → Students), and upload a project with images.
 3. Sign out (you should land on the landing page), then use "Forgot password" and sign in with the new password.
 4. Open a project in two browsers. A like or comment in one appears in the other within a second or two.
 5. Share a project link in a chat app. The preview should show its cover and title.
@@ -364,9 +371,10 @@ Supabase doesn't send email for your app. With [Resend](https://resend.com):
 
 ## Running the live site
 
-Day-to-day management happens in the **Admin** dashboard; no SQL needed. It updates live, and the **Students** and **Reports** tabs show badges for unverified students and pending reports. Search, filters and page number live in the address bar, so refreshing or going back keeps your place; press `/` to jump to the search box.
+Day-to-day management happens in the **Admin** dashboard; no SQL needed. It updates live, and the **Students** and **Reports** tabs show badges for students waiting for approval and pending reports. Search, filters and page number live in the address bar, so refreshing or going back keeps your place; press `/` to jump to the search box.
 
-- **Verify an email by hand** (needed while emails only reach your own address): the overview links straight to unverified students. Click **Verify** on a row, or tick several and use **Verify selected**. They can upload and comment straight away, without signing out, and get a notification saying so. Verification can't be undone; use **Suspend** for bad actors.
+- **How a student joins:** they sign up and get a confirmation email. They can't sign in until they click its link. Once they have, they can sign in and look around, and they appear under **Students** as **Awaiting approval** (the overview links straight to them). Click **Approve** on the row, or tick several and use **Approve selected**. They can upload, comment and report straight away, without signing out, and get an email and a notification saying so. Approval can't be undone; use **Suspend** for bad actors.
+- **Confirmation email never arrived?** The student can ask for a new link on the sign-in page (it appears when they try to sign in). If it still doesn't arrive, open them in **Students** and use **Confirm email for them**; you still approve them separately.
 - **See everything about a student:** click their row to open a side panel with their details, stats, projects and actions.
 - **Make someone an admin, remove admin access, or suspend an account** from the row's **⋯** menu or the side panel. These ask for confirmation first; reactivating doesn't.
 - **Account deletion requests.** Students ask in **Settings → Delete account**, confirming with their password (an optional reason is shown to admins). They are signed out everywhere and hidden at once. Requests show as a red badge on **Students** and on the overview. Open one and choose **Keep account** (it works again) or **Delete**, then type the username to confirm. Deleting removes the account, its projects, comments, likes and uploaded images for good, including other students' replies under their comments. If the student signs in before you decide, they can choose **Keep my account**, which withdraws the request. Admins can delete an account only if its owner asked or it is suspended: to remove an account that misbehaves, **Suspend** it first, then **Delete** appears.
@@ -412,7 +420,9 @@ Previews still share the Supabase project with the live site: live-update pings 
 | Build fails: `DIRECT_URL is required` or `P1001 Can't reach database server` | `DIRECT_URL` is missing or still contains placeholders/an old password |
 | No verification email; logs: `535 Authentication credentials invalid` | Wrong Resend API key. Create a new key and update `SMTP_PASS`, then redeploy |
 | Logs: `550 The gmail.com domain is not verified` | `EMAIL_FROM` uses an address you can't send from. Use `onboarding@resend.dev` or an address on your verified domain |
-| Logs: `You can only send testing emails to your own email address` | Expected with `onboarding@resend.dev`. Verify a domain in Resend, or click **Verify email** for them in Admin → Users |
+| Logs: `You can only send testing emails to your own email address` | Expected with `onboarding@resend.dev`. Switch to Gmail or verify a domain in Resend (Deployment step 2), or use **Confirm email for them** in Admin → Students |
+| Logs: `534-5.7.9 Application-specific password required` or `535-5.7.8 Username and Password not accepted` | Gmail needs an app password, not your normal password. Create one (Deployment step 2), update `SMTP_PASS`, redeploy |
+| Students say the email never came | Ask them to check spam, then use **Send a new link** on the sign-in page. Gmail's limit is about 500 emails a day |
 | Images or live updates broken after changing Supabase project | The Content-Security-Policy in `vercel.json` still names the old project. Replace `gxzbcrvsojdjbibfyieq.supabase.co` with the new project's host (three places) and redeploy |
 | Likes/comments don't update live | `SUPABASE_ANON_KEY` missing (check `/api/v1/realtime` isn't `null`), or the browser blocks WebSockets. Refreshing still shows the latest data |
 | Share preview shows the old/plain card | Social apps cache previews. New shares pick up changes; WhatsApp/LinkedIn may keep an old preview for a while |
@@ -425,7 +435,7 @@ Previews still share the Supabase project with the live site: live-update pings 
 
 ## Known limitations
 
-- **Email reaches only the owner** until a sending domain is verified in Resend (see Deployment step 2). Until then, verify accounts with **Verify email** in Admin → Users.
+- **Emails can land in spam**, especially from a new Gmail account. The sign-up screen tells students to check there.
 - **Build-log noise:** each Vercel build prints about 1,900 TypeScript errors from Vercel's function packager type-checking client files. They are harmless (deployments succeed) and don't happen in local builds; the cause on Vercel's side hasn't been identified.
 - **In-memory limits:** the general per-IP and write rate limits are per serverless instance; only the auth limits are shared through the database.
 - **Free plans:** the daily job keeps Supabase awake and takes backups, but backups sit in the same Supabase project, so download copies regularly (see *Running the live site*). Image files aren't included in backups.

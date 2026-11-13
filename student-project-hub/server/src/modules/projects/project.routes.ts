@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { optionalAuth, requireAuth, requireVerified } from '../../middleware/auth.js';
+import { optionalAuth, requireAuth, requireApproved } from '../../middleware/auth.js';
 import { multipartJson } from '../../middleware/multipart-json.js';
 import { writeLimiter } from '../../middleware/rate-limit.js';
 import { imageUpload, MAX_SCREENSHOTS } from '../../middleware/upload.js';
@@ -35,7 +35,7 @@ projectRouter.get('/recommended', optionalAuth, validate({ query: limitQuery }),
 projectRouter.post(
   '/',
   requireAuth,
-  requireVerified,
+  requireApproved,
   projectImages,
   multipartJson,
   validate({ body: createProjectSchema }),
@@ -62,7 +62,7 @@ projectRouter.delete('/:id', requireAuth, validate({ params: uuidParam }), contr
 projectRouter.post(
   '/:id/contributors',
   requireAuth,
-  requireVerified,
+  requireApproved,
   writeLimiter,
   validate({ params: uuidParam, body: inviteContributorSchema }),
   controller.inviteContributor,

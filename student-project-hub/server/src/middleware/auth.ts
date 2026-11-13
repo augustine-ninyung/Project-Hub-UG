@@ -28,10 +28,19 @@ async function resolveUser(token: string | undefined): Promise<AuthUser | null> 
 
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { id: true, role: true, status: true, emailVerifiedAt: true, lastActiveAt: true, deletionRequestedAt: true },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+      emailVerifiedAt: true,
+      approvedAt: true,
+      lastActiveAt: true,
+      deletionRequestedAt: true,
+    },
   });
-  // Suspended accounts and accounts waiting to be deleted can't act.
-  if (!user || user.status === 'SUSPENDED' || user.deletionRequestedAt) return null;
+  // Suspended accounts, accounts waiting to be deleted, and accounts whose
+  // email isn't confirmed can't act.
+  if (!user || user.status === 'SUSPENDED' || user.deletionRequestedAt || !user.emailVerifiedAt) return null;
 
   // Throttled "last active" tracking powers the "recently active students" list.
   if (!user.lastActiveAt || Date.now() - user.lastActiveAt.getTime() > ACTIVITY_UPDATE_INTERVAL_MS) {
@@ -44,7 +53,7 @@ async function resolveUser(token: string | undefined): Promise<AuthUser | null> 
     id: user.id,
     role: user.role,
     status: user.status,
-    emailVerified: user.emailVerifiedAt !== null,
+    approved: isApproved(user),
   };
 }
 
@@ -63,10 +72,18 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   next();
 };
 
-/** Must run after requireAuth. Content creation requires a verified email. */
-export const requireVerified: RequestHandler = (req, _res, next) => {
-  if (!req.user?.emailVerified) {
-    throw new ApiError(403, 'Please verify your email address first', 'EMAIL_NOT_VERIFIED');
+/** Admins are always approved; students once an admin approves them. */
+export const isApproved = (user: { role: Role; approvedAt: Date | null }) =>
+  user.role === 'ADMIN' || user.approvedAt !== null;
+
+/** Must run after requireAuth. Uploading, commenting and reporting need an admin's approval. */
+export const requireApproved: RequestHandler = (req, _res, next) => {
+  if (!req.user?.approved) {
+    throw new ApiError(
+      403,
+      'An admin needs to approve your account first. You will get an email when they do.',
+      'ACCOUNT_NOT_APPROVED',
+    );
   }
   next();
 };

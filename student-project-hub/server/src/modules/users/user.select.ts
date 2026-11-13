@@ -1,4 +1,5 @@
 import type { Prisma, User } from '../../generated/prisma/client.js';
+import { isApproved } from '../../middleware/auth.js';
 import { adminTopic, userTopic } from '../../services/realtime.service.js';
 
 /** Minimal public user info embedded in projects, comments, notifications. */
@@ -28,6 +29,8 @@ export function toSelfUser(user: User) {
     portfolioUrl: user.portfolioUrl,
     role: user.role,
     emailVerified: user.emailVerifiedAt !== null,
+    /** Can upload, comment and report. */
+    approved: isApproved(user),
     createdAt: user.createdAt,
     /** Private Realtime topic for live notification pings. */
     realtimeTopic: userTopic(user.id),

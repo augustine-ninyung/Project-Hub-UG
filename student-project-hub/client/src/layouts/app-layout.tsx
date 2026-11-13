@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from '@/components/layout/navbar';
 import { SidebarNav } from '@/components/layout/sidebar';
-import { VerifyEmailBanner } from '@/components/layout/verify-banner';
+import { ApprovalBanner } from '@/components/layout/approval-banner';
 import { Dialog, SheetContent } from '@/components/ui/dialog';
 import { LiveNotifications } from '@/features/notifications/live-notifications';
 import { LiveFeed } from '@/features/projects/live-feed';
@@ -122,7 +122,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
         )}
       >
         <Navbar onOpenMenu={() => setMenuOpen(true)} />
-        <VerifyEmailBanner />
+        <ApprovalBanner />
         <main ref={mainRef} id="main" className="mx-auto w-full max-w-7xl px-4 py-6 sm:py-8 lg:px-8">
           {children ?? <Outlet />}
         </main>

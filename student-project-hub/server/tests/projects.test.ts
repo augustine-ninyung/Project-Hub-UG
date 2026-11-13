@@ -67,11 +67,11 @@ describe('POST /projects', () => {
     expect(res.status).toBe(401);
   });
 
-  it('requires a verified email', async () => {
-    const { agent } = await signUp({ verified: false });
+  it('requires an approved account', async () => {
+    const { agent } = await signUp({ approved: false });
     const res = await agent.post('/api/v1/projects').field('data', JSON.stringify(projectData()));
     expect(res.status).toBe(403);
-    expect(res.body.error.code).toBe('EMAIL_NOT_VERIFIED');
+    expect(res.body.error.code).toBe('ACCOUNT_NOT_APPROVED');
   });
 
   it('validates fields', async () => {

@@ -20,6 +20,7 @@ export const testUser: SelfUser = {
   portfolioUrl: null,
   role: 'STUDENT',
   emailVerified: true,
+  approved: true,
   createdAt: new Date().toISOString(),
 };
 

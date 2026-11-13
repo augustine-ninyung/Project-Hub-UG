@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Flag, MailWarning, UserX } from 'lucide-react';
+import { ArrowRight, Flag, MailWarning, UserCheck, UserX } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ErrorState, PageLoader } from '@/components/common/states';
 import { Card, UserAvatar } from '@/components/ui/misc';
@@ -29,16 +29,24 @@ function StatTile({ label, value, sub, to }: { label: string; value: number; sub
 
 /** Shortcuts to the work waiting for an admin; hidden when there is none. */
 function NeedsAttention({
+  approvals,
   unverified,
   reports,
   deletions,
 }: {
+  approvals: number;
   unverified: number;
   reports: number;
   deletions: number;
 }) {
-  if (!unverified && !reports && !deletions) return null;
+  if (!approvals && !unverified && !reports && !deletions) return null;
   const items = [
+    approvals > 0 && {
+      to: '/admin/users?approval=pending',
+      icon: UserCheck,
+      text: `${approvals} student${approvals === 1 ? '' : 's'} waiting for approval`,
+      tone: 'text-primary bg-primary/10',
+    },
     deletions > 0 && {
       to: '/admin/users?deletion=requested',
       icon: UserX,
@@ -54,7 +62,7 @@ function NeedsAttention({
     unverified > 0 && {
       to: '/admin/users?verified=false',
       icon: MailWarning,
-      text: `${unverified} student${unverified === 1 ? '' : 's'} with unverified email`,
+      text: `${unverified} student${unverified === 1 ? " hasn't" : "s haven't"} confirmed their email yet`,
       tone: 'text-warning bg-warning/15',
     },
   ].filter(Boolean) as { to: string; icon: typeof Flag; text: string; tone: string }[];
@@ -88,7 +96,7 @@ export function AdminOverview() {
 
   return (
     <div className="space-y-6">
-      <NeedsAttention unverified={t.unverifiedUsers} reports={t.pendingReports} deletions={t.deletionRequests} />
+      <NeedsAttention approvals={t.awaitingApproval} unverified={t.unverifiedUsers} reports={t.pendingReports} deletions={t.deletionRequests} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile to="/admin/users" label="Students" value={t.users} sub={`+${t.newUsers} this week · ${t.activeUsers} active`} />
         <StatTile to="/admin/projects" label="Projects" value={t.projects} sub={`${t.publicProjects} public · +${t.newProjects} this week`} />

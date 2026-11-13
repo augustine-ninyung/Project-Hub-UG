@@ -12,7 +12,7 @@ export function CommentSection({ projectId, count }: { projectId: string; count:
   const { user, isAuthenticated } = useAuth();
   const query = useComments(projectId);
   const mutations = useCommentMutations(projectId);
-  const canInteract = isAuthenticated && !!user?.emailVerified;
+  const canInteract = isAuthenticated && !!user?.approved;
   const comments = query.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
@@ -26,7 +26,7 @@ export function CommentSection({ projectId, count }: { projectId: string; count:
       ) : (
         <div className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
           {isAuthenticated ? (
-            'Verify your email address to join the conversation.'
+            'You can comment once an admin approves your account.'
           ) : (
             <>
               <Link to="/login" className="font-medium text-primary hover:underline">

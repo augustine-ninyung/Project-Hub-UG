@@ -6,7 +6,7 @@ import { adminService, type AdminUser } from '@/services/admin.service';
 import { renderWithProviders, testUser } from './utils';
 
 vi.mock('@/services/admin.service', () => ({
-  adminService: { users: vi.fn(), verifyEmail: vi.fn(), updateUser: vi.fn(), deleteAccount: vi.fn(), keepAccount: vi.fn() },
+  adminService: { users: vi.fn(), verifyEmail: vi.fn(), approve: vi.fn(), updateUser: vi.fn(), deleteAccount: vi.fn(), keepAccount: vi.fn() },
 }));
 vi.mock('@/services/user.service', () => ({
   userService: { profile: vi.fn(() => new Promise(() => {})) },
@@ -26,6 +26,7 @@ const person = (id: string, over: Partial<AdminUser> = {}): AdminUser => ({
   role: 'STUDENT',
   status: 'ACTIVE',
   emailVerifiedAt: null,
+  approvedAt: null,
   deletionRequestedAt: null,
   deletionReason: null,
   lastActiveAt: null,
@@ -46,20 +47,32 @@ const row = (name: string) => screen.getByText(name).closest('tr')!;
 describe('Admin students tab', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('verifies instantly and rolls back if the server refuses', async () => {
-    serve([person('kofi')]);
+  it('approves instantly and rolls back if the server refuses', async () => {
+    serve([person('kofi', { emailVerifiedAt: new Date().toISOString() })]);
     let reject!: (e: Error) => void;
-    vi.mocked(adminService.verifyEmail).mockReturnValue(new Promise((_, r) => (reject = r)));
+    vi.mocked(adminService.approve).mockReturnValue(new Promise((_, r) => (reject = r)));
     renderWithProviders(<AdminUsers />, { user: admin });
 
     const kofi = await screen.findByText('Student kofi');
-    await userEvent.click(within(row('Student kofi')).getByRole('button', { name: /Verify/ }));
+    expect(within(row('Student kofi')).getByText('Awaiting approval')).toBeInTheDocument();
+    await userEvent.click(within(row('Student kofi')).getByRole('button', { name: /Approve/ }));
 
     // Badge disappears before the server answers.
-    expect(within(kofi.closest('tr')!).queryByText('Unverified')).not.toBeInTheDocument();
+    expect(within(kofi.closest('tr')!).queryByText('Awaiting approval')).not.toBeInTheDocument();
+    expect(adminService.approve).toHaveBeenCalledWith('kofi');
 
     reject(new Error('network'));
-    await waitFor(() => expect(within(row('Student kofi')).getByText('Unverified')).toBeInTheDocument());
+    await waitFor(() => expect(within(row('Student kofi')).getByText('Awaiting approval')).toBeInTheDocument());
+  });
+
+  it("can't approve a student who hasn't confirmed their email", async () => {
+    serve([person('esi')]);
+    renderWithProviders(<AdminUsers />, { user: admin });
+
+    await screen.findByText('Student esi');
+    expect(within(row('Student esi')).getByText('Email not confirmed')).toBeInTheDocument();
+    expect(within(row('Student esi')).queryByRole('button', { name: /Approve/ })).not.toBeInTheDocument();
+    expect(within(row('Student esi')).getByRole('button', { name: /Confirm email/ })).toBeInTheDocument();
   });
 
   it('asks for confirmation before making someone an admin', async () => {
@@ -82,20 +95,27 @@ describe('Admin students tab', () => {
     await waitFor(() => expect(within(row('Student ama')).getByText('Admin')).toBeInTheDocument());
   });
 
-  it('verifies several selected students at once', async () => {
-    serve([person('a1'), person('a2'), person('v1', { emailVerifiedAt: new Date().toISOString() })]);
-    vi.mocked(adminService.verifyEmail).mockResolvedValue(undefined);
+  it('approves several selected students at once', async () => {
+    const confirmed = { emailVerifiedAt: new Date().toISOString() };
+    serve([
+      person('a1', confirmed),
+      person('a2', confirmed),
+      person('done', { ...confirmed, approvedAt: new Date().toISOString() }),
+      person('new'),
+    ]);
+    vi.mocked(adminService.approve).mockResolvedValue(undefined);
     renderWithProviders(<AdminUsers />, { user: admin });
 
     await screen.findByText('Student a1');
-    // Only unverified students can be selected.
-    expect(within(row('Student v1')).queryByRole('checkbox')).not.toBeInTheDocument();
+    // Only students waiting for approval can be selected.
+    expect(within(row('Student done')).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(within(row('Student new')).queryByRole('checkbox')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all unverified on this page' }));
-    await userEvent.click(screen.getByRole('button', { name: /Verify selected/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select everyone awaiting approval on this page' }));
+    await userEvent.click(screen.getByRole('button', { name: /Approve selected/ }));
 
-    await waitFor(() => expect(adminService.verifyEmail).toHaveBeenCalledTimes(2));
-    expect(vi.mocked(adminService.verifyEmail).mock.calls.map((c) => c[0]).sort()).toEqual(['a1', 'a2']);
+    await waitFor(() => expect(adminService.approve).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(adminService.approve).mock.calls.map((c) => c[0]).sort()).toEqual(['a1', 'a2']);
   });
 
   it('opens the details panel when a student is clicked', async () => {
@@ -105,7 +125,8 @@ describe('Admin students tab', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Student yaw/ }));
     const panel = await screen.findByRole('dialog');
     expect(within(panel).getByText('yaw@example.edu')).toBeInTheDocument();
-    expect(within(panel).getByRole('button', { name: /Verify email/ })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: /Confirm email for them/ })).toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: /Approve account/ })).not.toBeInTheDocument();
   });
 });
 

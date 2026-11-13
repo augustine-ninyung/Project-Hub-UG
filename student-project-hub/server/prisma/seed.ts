@@ -298,6 +298,7 @@ async function main() {
       department: 'Administration',
       role: 'ADMIN',
       emailVerifiedAt: new Date(),
+      approvedAt: new Date(),
       lastActiveAt: new Date(),
     },
   });
@@ -312,6 +313,7 @@ async function main() {
         githubUrl: `https://github.com/${u.username}`,
         linkedinUrl: i % 2 === 0 ? `https://www.linkedin.com/in/${u.username}` : null,
         emailVerifiedAt: daysAgo(200),
+        approvedAt: daysAgo(200),
         createdAt: daysAgo(210 - i * 10),
         lastActiveAt: daysAgo(i * 0.6),
       },

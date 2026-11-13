@@ -14,6 +14,7 @@ const ICONS: Record<NotificationType, { icon: LucideIcon; className: string }> =
   CONTRIBUTOR_INVITED: { icon: UserPlus, className: 'bg-warning text-white' },
   CONTRIBUTOR_RESPONDED: { icon: UserCheck, className: 'bg-success text-white' },
   ACCOUNT_VERIFIED: { icon: BadgeCheck, className: 'bg-success text-white' },
+  ACCOUNT_APPROVED: { icon: BadgeCheck, className: 'bg-success text-white' },
 };
 
 export function NotificationItem({

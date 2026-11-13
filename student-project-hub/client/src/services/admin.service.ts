@@ -13,6 +13,8 @@ export interface AdminStatistics {
     likes: number;
     pendingReports: number;
     unverifiedUsers: number;
+    /** Confirmed their email, waiting for an admin to approve them. */
+    awaitingApproval: number;
     deletionRequests: number;
   };
   projectsByCategory: { name: string; count: number }[];
@@ -24,6 +26,7 @@ export interface AdminUser extends UserSummary {
   role: Role;
   status: 'ACTIVE' | 'SUSPENDED';
   emailVerifiedAt: string | null;
+  approvedAt: string | null;
   /** Set when the student asked for their account to be deleted. */
   deletionRequestedAt: string | null;
   deletionReason: string | null;
@@ -88,11 +91,14 @@ export const adminService = {
     status?: string;
     verified?: boolean;
     deletion?: 'requested';
+    approval?: 'pending';
   }) =>
     requestPage<AdminUser>({ url: '/admin/users', params }),
   updateUser: (id: string, data: { role?: Role; status?: 'ACTIVE' | 'SUSPENDED' }) =>
     request({ method: 'PATCH', url: `/admin/users/${id}`, data }),
   verifyEmail: (id: string) => request({ method: 'POST', url: `/admin/users/${id}/verify-email` }),
+  /** Only after the student confirmed their email. */
+  approve: (id: string) => request({ method: 'POST', url: `/admin/users/${id}/approve` }),
   /** Only for accounts whose owner asked to be deleted. */
   deleteAccount: (id: string) => request({ method: 'DELETE', url: `/admin/users/${id}` }),
   keepAccount: (id: string) => request({ method: 'POST', url: `/admin/users/${id}/keep` }),

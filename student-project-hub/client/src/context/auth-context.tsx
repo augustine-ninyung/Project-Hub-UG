@@ -12,7 +12,8 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (identifier: string, password: string, cancelDeletion?: boolean) => Promise<SelfUser>;
-  register: (data: RegisterPayload) => Promise<SelfUser>;
+  /** Creates the account; nobody is signed in until the email is confirmed. */
+  register: (data: RegisterPayload) => Promise<{ email: string }>;
   logout: () => Promise<void>;
   setUser: (user: SelfUser) => void;
 }
@@ -62,13 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (data: RegisterPayload) => {
-      const u = await authService.register(data);
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' });
-      setUser(u);
-      return u;
-    },
-    [queryClient, setUser],
+    (data: RegisterPayload) => authService.register(data),
+    [],
   );
 
   const logout = useCallback(async () => {

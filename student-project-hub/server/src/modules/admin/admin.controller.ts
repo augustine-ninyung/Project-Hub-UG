@@ -28,6 +28,10 @@ export async function verifyUserEmail(req: Request, res: Response) {
   sendSuccess(res, await adminService.verifyUserEmail(idOf(req), req.user!));
 }
 
+export async function approveUser(req: Request, res: Response) {
+  sendSuccess(res, await adminService.approveUser(idOf(req), req.user!));
+}
+
 export async function deleteAccount(req: Request, res: Response) {
   sendSuccess(res, await adminService.deleteRequestedAccount(idOf(req), req.user!));
 }

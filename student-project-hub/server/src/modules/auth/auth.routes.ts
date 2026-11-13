@@ -7,6 +7,7 @@ import {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resendVerificationSchema,
   resetPasswordSchema,
   verifyEmailSchema,
 } from './auth.schemas.js';
@@ -25,7 +26,13 @@ authRouter.post('/refresh', controller.refresh);
 authRouter.post('/logout', controller.logout);
 authRouter.get('/me', requireAuth, controller.me);
 authRouter.post('/verify-email', authLimiter, validate({ body: verifyEmailSchema }), controller.verifyEmail);
-authRouter.post('/resend-verification', authLimiter, requireAuth, controller.resendVerification);
+authRouter.post(
+  '/resend-verification',
+  authLimiter,
+  validate({ body: resendVerificationSchema }),
+  accountLimiter,
+  controller.resendVerification,
+);
 authRouter.post(
   '/forgot-password',
   authLimiter,

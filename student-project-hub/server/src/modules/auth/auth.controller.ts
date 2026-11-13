@@ -42,9 +42,8 @@ const sessionContext = (req: Request) => ({
 });
 
 export async function register(req: Request, res: Response) {
-  const { user, session } = await authService.register(req.body, sessionContext(req));
-  setSessionCookies(res, session);
-  sendSuccess(res, { user }, 201);
+  const { email } = await authService.register(req.body);
+  sendSuccess(res, { email, message: 'Check your email to confirm your account' }, 201);
 }
 
 export async function login(req: Request, res: Response) {
@@ -79,8 +78,10 @@ export async function verifyEmail(req: Request, res: Response) {
 }
 
 export async function resendVerification(req: Request, res: Response) {
-  await authService.resendVerification(req.user!.id);
-  sendSuccess(res, { message: 'Verification email sent' });
+  await authService.resendVerification(req.body.identifier);
+  sendSuccess(res, {
+    message: 'If that account still needs confirming, a new link has been sent',
+  });
 }
 
 export async function forgotPassword(req: Request, res: Response) {

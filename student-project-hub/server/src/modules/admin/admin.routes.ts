@@ -40,6 +40,7 @@ adminRouter.post(
   validate({ params: uuidParam }),
   controller.verifyUserEmail,
 );
+adminRouter.post('/users/:id/approve', validate({ params: uuidParam }), controller.approveUser);
 
 adminRouter.get('/projects', validate({ query: adminProjectsQuery }), controller.projects);
 adminRouter.patch(

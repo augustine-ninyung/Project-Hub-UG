@@ -4,7 +4,8 @@ export interface AuthUser {
   id: string;
   role: Role;
   status: UserStatus;
-  emailVerified: boolean;
+  /** An admin approved the account (admins always are). */
+  approved: boolean;
 }
 
 declare global {

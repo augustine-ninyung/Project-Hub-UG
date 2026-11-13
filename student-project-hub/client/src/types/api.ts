@@ -10,7 +10,8 @@ export type NotificationType =
   | 'COMMENT_REPLIED'
   | 'CONTRIBUTOR_INVITED'
   | 'CONTRIBUTOR_RESPONDED'
-  | 'ACCOUNT_VERIFIED';
+  | 'ACCOUNT_VERIFIED'
+  | 'ACCOUNT_APPROVED';
 export type ReportReason =
   | 'SPAM'
   | 'HARASSMENT'
@@ -50,6 +51,8 @@ export interface SelfUser extends UserSummary {
   portfolioUrl: string | null;
   role: Role;
   emailVerified: boolean;
+  /** An admin approved the account: can upload, comment and report. */
+  approved: boolean;
   createdAt: string;
   /** Private topic for live notification pings. */
   realtimeTopic?: string;

@@ -55,6 +55,7 @@ enum NotificationType {
   CONTRIBUTOR_INVITED
   CONTRIBUTOR_RESPONDED
   ACCOUNT_VERIFIED
+  ACCOUNT_APPROVED
 }
 
 enum ReportTargetType {
@@ -86,6 +87,8 @@ model User {
   role            Role       @default(STUDENT)
   status          UserStatus @default(ACTIVE)
   emailVerifiedAt DateTime?
+  /// Set when an admin approves the account; needed to upload, comment and report.
+  approvedAt      DateTime?
   /// Set when the student asks for their account to be deleted; an admin confirms.
   deletionRequestedAt DateTime?
   deletionReason      String?   @db.Text
@@ -109,6 +112,7 @@ model User {
   @@index([createdAt])
   @@index([role])
   @@index([deletionRequestedAt])
+  @@index([approvedAt])
 }
 
 // One row per refresh token (i.e. per signed-in device). Only the SHA-256

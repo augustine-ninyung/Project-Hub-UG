@@ -10,6 +10,7 @@ import {
   ShieldOff,
   Trash2,
   Undo2,
+  UserCheck,
   Users,
   X,
 } from 'lucide-react';
@@ -41,13 +42,23 @@ const LIST_KEY = ['admin', 'users'] as const;
 
 type Sensitive = { kind: 'role' | 'suspend'; user: AdminUser };
 
+/** Confirmed their email and waiting for an admin to let them upload. */
+export const awaitsApproval = (u: AdminUser) =>
+  u.role === 'STUDENT' && u.status === 'ACTIVE' && !!u.emailVerifiedAt && !u.approvedAt && !u.deletionRequestedAt;
+
 /** All user actions, shared by the table rows and the details panel. */
 function useUserActions() {
   const verify = useOptimisticRows<AdminUser, string>({
     listKey: LIST_KEY,
     mutationFn: (id) => adminService.verifyEmail(id),
     apply: (u, id) => (u.id === id ? { ...u, emailVerifiedAt: new Date().toISOString() } : u),
-    success: 'Email verified. They can now upload and comment.',
+    success: 'Email confirmed. They can sign in now; approve them to let them upload.',
+  });
+  const approve = useOptimisticRows<AdminUser, string>({
+    listKey: LIST_KEY,
+    mutationFn: (id) => adminService.approve(id),
+    apply: (u, id) => (u.id === id ? { ...u, approvedAt: new Date().toISOString() } : u),
+    success: "Approved. They can upload now, and we've emailed them.",
   });
   const update = useOptimisticRows<AdminUser, { id: string; data: { role?: AdminUser['role']; status?: AdminUser['status'] } }>({
     listKey: LIST_KEY,
@@ -75,7 +86,7 @@ function useUserActions() {
     apply: (u, id) => (u.id === id ? { ...u, deletionRequestedAt: null, deletionReason: null } : u),
     success: 'Request declined. The account works again.',
   });
-  return { verify, update, deleteAccount, keepAccount };
+  return { verify, approve, update, deleteAccount, keepAccount };
 }
 
 /**
@@ -140,7 +151,8 @@ function StatusBadges({ user }: { user: AdminUser }) {
       ) : (
         <Badge variant="success">Active</Badge>
       )}
-      {!user.emailVerifiedAt && <Badge variant="warning">Unverified</Badge>}
+      {!user.emailVerifiedAt && <Badge variant="warning">Email not confirmed</Badge>}
+      {awaitsApproval(user) && <Badge variant="warning">Awaiting approval</Badge>}
       {user.deletionRequestedAt && <Badge variant="destructive">Deletion requested</Badge>}
     </span>
   );
@@ -217,10 +229,21 @@ function RowActions({
             <Trash2 /> Delete
           </Button>
         </>
-      ) : !user.emailVerifiedAt && (
-        <Button variant="outline" size="sm" onClick={() => actions.verify.mutate(user.id)}>
-          <MailCheck /> Verify
+      ) : awaitsApproval(user) ? (
+        <Button size="sm" onClick={() => actions.approve.mutate(user.id)}>
+          <UserCheck /> Approve
         </Button>
+      ) : (
+        !user.emailVerifiedAt && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => actions.verify.mutate(user.id)}
+            title="Only if their confirmation email never arrived"
+          >
+            <MailCheck /> Confirm email
+          </Button>
+        )
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -419,10 +442,27 @@ function UserPanel({
                 <p className="text-sm text-muted-foreground">This is your own account. Another admin can change your role or status.</p>
               ) : user.deletionRequestedAt ? null : (
                 <>
+                  {awaitsApproval(user) && (
+                    <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <p className="text-sm">
+                        Confirmed their email {timeAgo(user.emailVerifiedAt!)}. Approve them to let them upload,
+                        comment and report.
+                      </p>
+                      <Button className="w-full" onClick={() => actions.approve.mutate(user.id)}>
+                        <UserCheck /> Approve account
+                      </Button>
+                    </div>
+                  )}
                   {!user.emailVerifiedAt && (
-                    <Button className="w-full" onClick={() => actions.verify.mutate(user.id)}>
-                      <MailCheck /> Verify email
-                    </Button>
+                    <div className="space-y-2 rounded-lg border p-3">
+                      <p className="text-sm text-muted-foreground">
+                        They haven't clicked the link in their confirmation email yet, so they can't sign in. If it
+                        never arrived, you can confirm it for them.
+                      </p>
+                      <Button variant="outline" className="w-full" onClick={() => actions.verify.mutate(user.id)}>
+                        <MailCheck /> Confirm email for them
+                      </Button>
+                    </div>
                   )}
                   <div className="grid grid-cols-2 gap-2">
                     <Button variant="outline" onClick={() => onSensitive({ kind: 'role', user })}>
@@ -475,10 +515,11 @@ export function AdminUsers() {
   const role = get('role');
   const status = get('status');
   const deletion = get('deletion') === 'requested';
+  const approval = get('approval') === 'pending';
   const openId = get('user');
 
   const query = useQuery({
-    queryKey: [...LIST_KEY, { page, q, verified, role, status, deletion }],
+    queryKey: [...LIST_KEY, { page, q, verified, role, status, deletion, approval }],
     queryFn: () =>
       adminService.users({
         page,
@@ -487,6 +528,7 @@ export function AdminUsers() {
         role: (role || undefined) as AdminUser['role'] | undefined,
         status: status || undefined,
         deletion: deletion ? 'requested' : undefined,
+        approval: approval ? 'pending' : undefined,
       }),
     placeholderData: keepPreviousData,
   });
@@ -508,47 +550,49 @@ export function AdminUsers() {
     set({ user: u.id });
   };
 
-  // Bulk verification of unverified students on this page.
+  // Bulk approval of students waiting on this page.
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  useEffect(() => setSelected(new Set()), [page, q, verified, role, status]);
-  const selectable = items.filter((u) => !u.emailVerifiedAt && u.id !== me?.id);
+  useEffect(() => setSelected(new Set()), [page, q, verified, role, status, approval]);
+  const selectable = items.filter((u) => awaitsApproval(u) && u.id !== me?.id);
   const allSelected = selectable.length > 0 && selectable.every((u) => selected.has(u.id));
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  const verifySelected = async () => {
+  const approveSelected = async () => {
     const ids = [...selected];
     setBulkBusy(true);
     const now = new Date().toISOString();
     queryClient.setQueriesData<{ items: AdminUser[] }>({ queryKey: LIST_KEY }, (old) =>
-      old ? { ...old, items: old.items.map((u) => (selected.has(u.id) ? { ...u, emailVerifiedAt: now } : u)) } : old,
+      old ? { ...old, items: old.items.map((u) => (selected.has(u.id) ? { ...u, approvedAt: now } : u)) } : old,
     );
-    const results = await Promise.allSettled(ids.map((id) => adminService.verifyEmail(id)));
+    const results = await Promise.allSettled(ids.map((id) => adminService.approve(id)));
     const failed = results.filter((r) => r.status === 'rejected').length;
-    if (failed === 0) toast.success(`Verified ${ids.length} student${ids.length === 1 ? '' : 's'}`);
-    else toast.error(`${ids.length - failed} verified, ${failed} failed. The list has been refreshed.`);
+    if (failed === 0) toast.success(`Approved ${ids.length} student${ids.length === 1 ? '' : 's'}`);
+    else toast.error(`${ids.length - failed} approved, ${failed} failed. The list has been refreshed.`);
     setSelected(new Set());
     setBulkBusy(false);
     void queryClient.invalidateQueries({ queryKey: ['admin'] });
   };
 
-  const filtersActive = Boolean(q || verified || role || status || deletion);
+  const filtersActive = Boolean(q || verified || role || status || deletion || approval);
   const busy = query.isFetching && query.isPlaceholderData;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Search by name, username or email" />
-        <Select value={verified} onChange={(e) => set({ verified: e.target.value, page: null })} className="w-40" aria-label="Verification">
-          <option value="">Any verification</option>
-          <option value="false">Unverified</option>
-          <option value="true">Verified</option>
+        <Select value={verified} onChange={(e) => set({ verified: e.target.value, page: null })} className="w-44" aria-label="Email">
+          <option value="">Any email status</option>
+          <option value="false">Email not confirmed</option>
+          <option value="true">Email confirmed</option>
         </Select>
         <Select
-          value={deletion ? 'deletion' : status}
+          value={deletion ? 'deletion' : approval ? 'approval' : status}
           onChange={(e) =>
             e.target.value === 'deletion'
-              ? set({ deletion: 'requested', status: null, page: null })
-              : set({ status: e.target.value, deletion: null, page: null })
+              ? set({ deletion: 'requested', approval: null, status: null, page: null })
+              : e.target.value === 'approval'
+                ? set({ approval: 'pending', deletion: null, status: null, page: null })
+                : set({ status: e.target.value, deletion: null, approval: null, page: null })
           }
           className="w-44"
           aria-label="Status"
@@ -556,6 +600,7 @@ export function AdminUsers() {
           <option value="">Any status</option>
           <option value="ACTIVE">Active</option>
           <option value="SUSPENDED">Suspended</option>
+          <option value="approval">Awaiting approval</option>
           <option value="deletion">Deletion requested</option>
         </Select>
         <Select value={role} onChange={(e) => set({ role: e.target.value, page: null })} className="w-32" aria-label="Role">
@@ -564,7 +609,7 @@ export function AdminUsers() {
           <option value="ADMIN">Admins</option>
         </Select>
         {filtersActive && (
-          <Button variant="ghost" size="sm" onClick={() => set({ q: null, verified: null, role: null, status: null, deletion: null, page: null })}>
+          <Button variant="ghost" size="sm" onClick={() => set({ q: null, verified: null, role: null, status: null, deletion: null, approval: null, page: null })}>
             <X /> Clear filters
           </Button>
         )}
@@ -576,8 +621,8 @@ export function AdminUsers() {
       {selected.size > 0 && (
         <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm animate-fade-in">
           <span className="font-medium">{selected.size} selected</span>
-          <Button size="sm" loading={bulkBusy} onClick={verifySelected}>
-            <MailCheck /> Verify selected
+          <Button size="sm" loading={bulkBusy} onClick={approveSelected}>
+            <UserCheck /> Approve selected
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} disabled={bulkBusy}>
             Cancel
@@ -600,7 +645,7 @@ export function AdminUsers() {
             head={[
               <Checkbox
                 key="all"
-                label="Select all unverified on this page"
+                label="Select everyone awaiting approval on this page"
                 checked={allSelected}
                 indeterminate={!allSelected && selectable.some((u) => selected.has(u.id))}
                 disabled={selectable.length === 0}
@@ -619,7 +664,7 @@ export function AdminUsers() {
               <SkeletonRows cols={6} />
             ) : (
               items.map((u) => {
-                const canSelect = !u.emailVerifiedAt && u.id !== me?.id;
+                const canSelect = awaitsApproval(u) && u.id !== me?.id;
                 return (
                   <tr
                     key={u.id}

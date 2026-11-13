@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { MailWarning } from 'lucide-react';
+import { Hourglass } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,12 +16,12 @@ export default function NewProjectPage() {
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState<number | null>(null);
 
-  if (!user?.emailVerified) {
+  if (!user?.approved) {
     return (
       <EmptyState
-        icon={MailWarning}
-        title="Verify your email first"
-        description="Use the link we emailed you (or resend it from the banner above) before sharing projects."
+        icon={Hourglass}
+        title="Waiting for approval"
+        description="An admin needs to approve your account before you can share projects. We'll email you when they do, usually within a day."
       />
     );
   }

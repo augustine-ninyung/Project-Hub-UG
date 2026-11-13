@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 import { FormAlert } from '@/components/common/form-alert';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/form-controls';
 import { useAuth } from '@/context/auth-context';
+import { CheckEmail } from '@/features/auth/check-email';
 import { registerSchema, type RegisterValues } from '@/features/auth/schemas';
 import { applyServerErrors } from '@/hooks/use-server-errors';
 import { getErrorMessage } from '@/services/api';
@@ -14,7 +15,8 @@ const FIELDS = ['fullName', 'username', 'email', 'password', 'university', 'depa
 
 export default function RegisterPage() {
   const { register: signUp } = useAuth();
-  const navigate = useNavigate();
+  // Set once the account exists: the form gives way to "check your email".
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -24,9 +26,9 @@ export default function RegisterPage() {
 
   const onSubmit = async ({ confirmPassword: _confirm, ...values }: RegisterValues) => {
     try {
-      await signUp(values);
-      toast.success('Account created! Check your email to verify your address.');
-      navigate('/');
+      const { email } = await signUp(values);
+      setSentTo(email);
+      window.scrollTo({ top: 0 });
     } catch (err) {
       // 409s identify which unique field clashed.
       const message = getErrorMessage(err);
@@ -42,6 +44,28 @@ export default function RegisterPage() {
     'aria-describedby': errors[name] ? `${name}-error` : undefined,
     ...register(name),
   });
+
+  if (sentTo) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">Almost there</h1>
+          <p className="text-sm text-muted-foreground">Your account is created. Two quick steps left.</p>
+        </div>
+        <CheckEmail identifier={sentTo} email={sentTo} title="1. Confirm your email" />
+        <div className="space-y-1.5 rounded-lg border p-4 text-sm">
+          <p className="font-medium">2. Wait for approval</p>
+          <p className="text-muted-foreground">
+            After you confirm, you can sign in and look around. An admin then approves your account so you can
+            upload projects and comment. We'll email you when that happens.
+          </p>
+        </div>
+        <Button asChild variant="outline" className="w-full">
+          <Link to="/login">Go to sign in</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -27,7 +27,8 @@ export function LiveNotifications() {
     if (!newest) return;
     // An admin verified this account: refresh it so posting unlocks and the
     // "verify your email" banner goes away without a reload.
-    if (newest.type === 'ACCOUNT_VERIFIED') void queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
+    // Approval unlocks uploading on this session straight away.
+    if (newest.type === 'ACCOUNT_VERIFIED' || newest.type === 'ACCOUNT_APPROVED') void queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
     toast(`${newest.actor?.fullName ?? 'Someone'} ${newest.message}`, {
       id: `notification-${newest.id}`,
       icon: <Bell className="size-4 text-primary" aria-hidden />,

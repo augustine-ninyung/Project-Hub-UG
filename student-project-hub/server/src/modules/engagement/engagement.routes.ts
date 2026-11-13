@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { optionalAuth, requireAuth, requireVerified } from '../../middleware/auth.js';
+import { optionalAuth, requireAuth, requireApproved } from '../../middleware/auth.js';
 import { writeLimiter } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { uuidParam } from '../../utils/common-schemas.js';
@@ -32,7 +32,7 @@ commentRoutesForProject.get(
 commentRoutesForProject.post(
   '/comments',
   requireAuth,
-  requireVerified,
+  requireApproved,
   writeLimiter,
   validate({ params: uuidParam, body: createCommentSchema }),
   controller.createComment,

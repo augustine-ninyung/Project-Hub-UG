@@ -6,12 +6,22 @@ import { slugify } from '../../utils/common-schemas.js';
 import { deleteComment } from '../engagement/engagement.service.js';
 import { notify } from '../notifications/notification.service.js';
 import { deleteProject } from '../projects/project.service.js';
+import { sendAccountApprovedEmail } from '../../services/email.service.js';
 import { removeImages } from '../../services/storage.service.js';
 import { FEED_TOPIC, projectTopic, queueTopic } from '../../services/realtime.service.js';
 import { userSummarySelect } from '../users/user.select.js';
 import type { AdminProjectsQuery, AdminReportsQuery, AdminUsersQuery } from './admin.schemas.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Students who confirmed their email and are waiting for an admin to approve them. */
+const AWAITING_APPROVAL = {
+  role: 'STUDENT',
+  status: 'ACTIVE',
+  emailVerifiedAt: { not: null },
+  approvedAt: null,
+  deletionRequestedAt: null,
+} satisfies Prisma.UserWhereInput;
 
 export async function getStatistics() {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
@@ -28,6 +38,7 @@ export async function getStatistics() {
     likes,
     pendingReports,
     unverifiedUsers,
+    awaitingApproval,
     deletionRequests,
     byCategory,
     recentSignups,
@@ -43,6 +54,7 @@ export async function getStatistics() {
     prisma.like.count(),
     prisma.report.count({ where: { status: 'PENDING' } }),
     prisma.user.count({ where: { emailVerifiedAt: null } }),
+    prisma.user.count({ where: AWAITING_APPROVAL }),
     prisma.user.count({ where: { deletionRequestedAt: { not: null } } }),
     prisma.category.findMany({
       select: { name: true, _count: { select: { projects: true } } },
@@ -82,6 +94,7 @@ export async function getStatistics() {
       likes,
       pendingReports,
       unverifiedUsers,
+      awaitingApproval,
       deletionRequests,
     },
     projectsByCategory: byCategory.map((c) => ({ name: c.name, count: c._count.projects })),
@@ -173,6 +186,7 @@ export async function listUsers(query: AdminUsersQuery) {
     ...(query.role ? { role: query.role } : {}),
     ...(query.status ? { status: query.status } : {}),
     ...(query.deletion === 'requested' ? { deletionRequestedAt: { not: null } } : {}),
+    ...(query.approval === 'pending' ? AWAITING_APPROVAL : {}),
     ...(query.verified !== undefined
       ? { emailVerifiedAt: query.verified ? { not: null } : null }
       : {}),
@@ -195,13 +209,19 @@ export async function listUsers(query: AdminUsersQuery) {
         role: true,
         status: true,
         emailVerifiedAt: true,
+        approvedAt: true,
         deletionRequestedAt: true,
         deletionReason: true,
         lastActiveAt: true,
         createdAt: true,
         _count: { select: { projects: true, comments: true } },
       },
-      orderBy: query.deletion ? { deletionRequestedAt: 'asc' } : { createdAt: 'desc' },
+      // Queues are served oldest first; everything else newest first.
+      orderBy: query.deletion
+        ? { deletionRequestedAt: 'asc' }
+        : query.approval
+          ? { createdAt: 'asc' }
+          : { createdAt: 'desc' },
       skip: (query.page - 1) * query.limit,
       take: query.limit,
     }),
@@ -221,6 +241,10 @@ export async function updateUser(
     data: input,
     select: { ...userSummarySelect, email: true, role: true, status: true },
   });
+  if (input.role === 'ADMIN') {
+    // Admins are approved by definition; keep that if they're later made a student again.
+    await prisma.user.updateMany({ where: { id, approvedAt: null }, data: { approvedAt: new Date() } });
+  }
   if (input.status === 'SUSPENDED') {
     // End all active sessions immediately.
     await prisma.userSession.updateMany({
@@ -258,13 +282,46 @@ export async function verifyUserEmail(id: string, admin: AuthUser) {
       type: 'ACCOUNT_VERIFIED',
       recipientId: id,
       actorId: admin.id,
-      message: 'verified your account. You can now upload projects and comment.',
+      message: 'confirmed your email address for you. Your account now needs approval before you can upload.',
     });
     return tx.user.findUniqueOrThrow({
       where: { id },
-      select: { ...userSummarySelect, email: true, emailVerifiedAt: true },
+      select: { ...userSummarySelect, email: true, emailVerifiedAt: true, approvedAt: true },
     });
   });
+}
+
+/**
+ * Lets a student upload, comment and report. Only after they confirmed their
+ * email themselves, so every approved account has a working address.
+ */
+export async function approveUser(id: string, admin: AuthUser) {
+  const user = await prisma.$transaction(async (tx) => {
+    // Conditional update so two admins clicking at once can't both approve.
+    const { count } = await tx.user.updateMany({
+      where: { id, approvedAt: null, emailVerifiedAt: { not: null } },
+      data: { approvedAt: new Date() },
+    });
+    if (count === 0) {
+      const found = await tx.user.findUnique({ where: { id }, select: { approvedAt: true } });
+      if (!found) throw ApiError.notFound('User not found');
+      throw found.approvedAt
+        ? ApiError.conflict('This account is already approved')
+        : ApiError.conflict('This student has not confirmed their email yet');
+    }
+    await notify(tx, {
+      type: 'ACCOUNT_APPROVED',
+      recipientId: id,
+      actorId: admin.id,
+      message: 'approved your account. You can now upload projects and comment.',
+    });
+    return tx.user.findUniqueOrThrow({
+      where: { id },
+      select: { ...userSummarySelect, email: true, emailVerifiedAt: true, approvedAt: true },
+    });
+  });
+  await sendAccountApprovedEmail(user.email, user.fullName);
+  return user;
 }
 
 /** Admins act only on accounts whose owner asked for deletion. */

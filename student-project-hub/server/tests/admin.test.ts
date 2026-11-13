@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { prisma } from '../src/config/prisma.js';
-import { createCategory, signUp } from './helpers.js';
+import { client, createCategory, PASSWORD, signUp } from './helpers.js';
 
 describe('admin authorization', () => {
   it('rejects students on every admin endpoint', async () => {
@@ -109,20 +109,23 @@ describe('manual email verification', () => {
       }),
     );
 
-  it('lets an admin verify a student, who can then post straight away', async () => {
+  it("confirms a student's email when the link never arrived, so they can sign in", async () => {
     const category = await createCategory();
     const { agent: admin, user: adminUser } = await signUp({ role: 'ADMIN' });
-    const { agent: student, user } = await signUp({ verified: false });
+    const { user } = await signUp({ verified: false });
+    const student = client();
+    const signIn = () => student.post('/api/v1/auth/login').send({ identifier: user.email, password: PASSWORD });
 
-    expect((await postProject(student, category.id)).status).toBe(403);
+    expect((await signIn()).body.error.code).toBe('EMAIL_NOT_VERIFIED');
 
     const res = await admin.post(`/api/v1/admin/users/${user.id}/verify-email`);
     expect(res.status).toBe(200);
     expect(res.body.data.emailVerifiedAt).toBeTruthy();
+    expect(res.body.data.approvedAt).toBeNull();
 
-    // Takes effect on the student's existing session, no re-login needed.
-    expect((await student.get('/api/v1/auth/me')).body.data.user.emailVerified).toBe(true);
-    expect((await postProject(student, category.id)).status).toBe(201);
+    // They can sign in now, but still need approval to post.
+    expect((await signIn()).status).toBe(200);
+    expect((await postProject(student, category.id)).body.error.code).toBe('ACCOUNT_NOT_APPROVED');
 
     const notifications = await prisma.notification.findMany({ where: { recipientId: user.id } });
     expect(notifications).toHaveLength(1);

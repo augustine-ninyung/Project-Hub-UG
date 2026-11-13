@@ -7,6 +7,7 @@ import { FormAlert } from '@/components/common/form-alert';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/form-controls';
 import { useAuth } from '@/context/auth-context';
+import { CheckEmail } from '@/features/auth/check-email';
 import { loginSchema, type LoginValues } from '@/features/auth/schemas';
 import { applyServerErrors } from '@/hooks/use-server-errors';
 import { getErrorCode } from '@/services/api';
@@ -27,6 +28,8 @@ export default function LoginPage() {
   // The account has a pending deletion request; offer to keep it.
   const [deletionPending, setDeletionPending] = useState(false);
   const [keeping, setKeeping] = useState(false);
+  // Right password, but the email isn't confirmed yet: offer a new link.
+  const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
 
   const signIn = async (values: LoginValues, cancelDeletion = false) => {
     const user = await login(values.identifier, values.password, cancelDeletion);
@@ -40,10 +43,13 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginValues) => {
     setDeletionPending(false);
+    setUnconfirmed(null);
     try {
       await signIn(values);
     } catch (err) {
-      if (getErrorCode(err) === 'ACCOUNT_DELETION_PENDING') setDeletionPending(true);
+      const code = getErrorCode(err);
+      if (code === 'ACCOUNT_DELETION_PENDING') setDeletionPending(true);
+      else if (code === 'EMAIL_NOT_VERIFIED') setUnconfirmed(values.identifier);
       else applyServerErrors(err, setError, []);
     }
   };
@@ -74,6 +80,14 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <FormAlert>{errors.root?.message}</FormAlert>
+        {unconfirmed && (
+          <CheckEmail
+            key={unconfirmed}
+            identifier={unconfirmed}
+            email={unconfirmed.includes('@') ? unconfirmed : undefined}
+            title="Confirm your email to sign in"
+          />
+        )}
         {deletionPending && (
           <div role="alert" className="space-y-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm animate-fade-in">
             <p>
