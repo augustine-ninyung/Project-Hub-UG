@@ -4,7 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Pagination } from '@/components/common/pagination';
 import { PageHeader } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
-import { Input, Select } from '@/components/ui/form-controls';
+import { Input } from '@/components/ui/form-controls';
+import { SelectMenu } from '@/components/ui/select-menu';
 import { useCategories, useProjects, useTechnologies } from '@/features/projects/hooks';
 import { ProjectGrid } from '@/features/projects/project-grid';
 import type { ProjectSort } from '@/services/project.service';
@@ -94,25 +95,16 @@ export default function ExplorePage() {
             aria-label="Search projects"
           />
         </div>
-        <Select
+        <SelectMenu
           value={technology}
-          onChange={(e) => update({ technology: e.target.value || null })}
+          onValueChange={(v) => update({ technology: v || null })}
           aria-label="Filter by technology"
-        >
-          <option value="">All technologies</option>
-          {technologies.data?.map((t) => (
-            <option key={t.id} value={t.slug}>
-              {t.name}
-            </option>
-          ))}
-        </Select>
-        <Select value={sort} onChange={(e) => update({ sort: e.target.value })} aria-label="Sort projects">
-          {SORTS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </Select>
+          options={[
+            { value: '', label: 'All technologies' },
+            ...(technologies.data ?? []).map((t) => ({ value: t.slug, label: t.name })),
+          ]}
+        />
+        <SelectMenu value={sort} onValueChange={(v) => update({ sort: v })} aria-label="Sort projects" options={SORTS} />
       </div>
 
       <div className="mb-4 flex min-h-8 items-center justify-between gap-2 text-sm text-muted-foreground">

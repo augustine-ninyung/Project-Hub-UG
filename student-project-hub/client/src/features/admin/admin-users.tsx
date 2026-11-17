@@ -30,7 +30,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog';
-import { Field, Input, Select } from '@/components/ui/form-controls';
+import { Field, Input } from '@/components/ui/form-controls';
+import { SelectMenu } from '@/components/ui/select-menu';
 import { Badge, Skeleton, UserAvatar } from '@/components/ui/misc';
 import { useAuth } from '@/context/auth-context';
 import { adminService, type AdminUser } from '@/services/admin.service';
@@ -580,34 +581,47 @@ export function AdminUsers() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Search by name, username or email" />
-        <Select value={verified} onChange={(e) => set({ verified: e.target.value, page: null })} className="w-44" aria-label="Email">
-          <option value="">Any email status</option>
-          <option value="false">Email not confirmed</option>
-          <option value="true">Email confirmed</option>
-        </Select>
-        <Select
+        <SelectMenu
+          value={verified}
+          onValueChange={(v) => set({ verified: v, page: null })}
+          className="w-48"
+          aria-label="Email"
+          options={[
+            { value: '', label: 'Any email status' },
+            { value: 'false', label: 'Email not confirmed' },
+            { value: 'true', label: 'Email confirmed' },
+          ]}
+        />
+        <SelectMenu
           value={deletion ? 'deletion' : approval ? 'approval' : status}
-          onChange={(e) =>
-            e.target.value === 'deletion'
+          onValueChange={(v) =>
+            v === 'deletion'
               ? set({ deletion: 'requested', approval: null, status: null, page: null })
-              : e.target.value === 'approval'
+              : v === 'approval'
                 ? set({ approval: 'pending', deletion: null, status: null, page: null })
-                : set({ status: e.target.value, deletion: null, approval: null, page: null })
+                : set({ status: v, deletion: null, approval: null, page: null })
           }
-          className="w-44"
+          className="w-48"
           aria-label="Status"
-        >
-          <option value="">Any status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="SUSPENDED">Suspended</option>
-          <option value="approval">Awaiting approval</option>
-          <option value="deletion">Deletion requested</option>
-        </Select>
-        <Select value={role} onChange={(e) => set({ role: e.target.value, page: null })} className="w-32" aria-label="Role">
-          <option value="">Any role</option>
-          <option value="STUDENT">Students</option>
-          <option value="ADMIN">Admins</option>
-        </Select>
+          options={[
+            { value: '', label: 'Any status' },
+            { value: 'ACTIVE', label: 'Active' },
+            { value: 'SUSPENDED', label: 'Suspended' },
+            { value: 'approval', label: 'Awaiting approval' },
+            { value: 'deletion', label: 'Deletion requested' },
+          ]}
+        />
+        <SelectMenu
+          value={role}
+          onValueChange={(v) => set({ role: v, page: null })}
+          className="w-36"
+          aria-label="Role"
+          options={[
+            { value: '', label: 'Any role' },
+            { value: 'STUDENT', label: 'Students' },
+            { value: 'ADMIN', label: 'Admins' },
+          ]}
+        />
         {filtersActive && (
           <Button variant="ghost" size="sm" onClick={() => set({ q: null, verified: null, role: null, status: null, deletion: null, approval: null, page: null })}>
             <X /> Clear filters

@@ -8,7 +8,8 @@ import { Pagination } from '@/components/common/pagination';
 import { EmptyState, ErrorState, PageLoader } from '@/components/common/states';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader } from '@/components/ui/dialog';
-import { Field, Input, Select, Textarea } from '@/components/ui/form-controls';
+import { Field, Input, Textarea } from '@/components/ui/form-controls';
+import { SelectMenu } from '@/components/ui/select-menu';
 import { Badge, Card } from '@/components/ui/misc';
 import { useCategories } from '@/features/projects/hooks';
 import { getErrorMessage } from '@/services/api';
@@ -62,11 +63,17 @@ export function AdminProjects() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput placeholder="Search by title or owner" />
-        <Select value={featured} onChange={(e) => set({ featured: e.target.value, page: null })} className="w-40" aria-label="Featured filter">
-          <option value="">All projects</option>
-          <option value="true">Featured only</option>
-          <option value="false">Not featured</option>
-        </Select>
+        <SelectMenu
+          value={featured}
+          onValueChange={(v) => set({ featured: v, page: null })}
+          className="w-44"
+          aria-label="Featured filter"
+          options={[
+            { value: '', label: 'All projects' },
+            { value: 'true', label: 'Featured only' },
+            { value: 'false', label: 'Not featured' },
+          ]}
+        />
         {filtersActive && (
           <Button variant="ghost" size="sm" onClick={() => set({ q: null, featured: null, page: null })}>
             <X /> Clear filters
@@ -273,19 +280,18 @@ export function AdminReports() {
 
   return (
     <div className="space-y-4">
-      <Select
+      <SelectMenu
         value={status}
-        onChange={(e) =>
-          set({ status: e.target.value === 'PENDING' ? null : e.target.value || 'all', page: null })
-        }
+        onValueChange={(v) => set({ status: v === 'PENDING' ? null : v || 'all', page: null })}
         className="w-44"
         aria-label="Report status"
-      >
-        <option value="PENDING">Pending</option>
-        <option value="RESOLVED">Resolved</option>
-        <option value="DISMISSED">Dismissed</option>
-        <option value="">All reports</option>
-      </Select>
+        options={[
+          { value: 'PENDING', label: 'Pending' },
+          { value: 'RESOLVED', label: 'Resolved' },
+          { value: 'DISMISSED', label: 'Dismissed' },
+          { value: '', label: 'All reports' },
+        ]}
+      />
       {query.isLoading ? (
         <PageLoader />
       ) : query.error ? (

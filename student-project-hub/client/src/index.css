@@ -9,6 +9,10 @@
  * --primary is a deeper clay so white button text keeps AA contrast.
  */
 :root {
+  /* Tells the browser which theme is on, so its own controls (dropdown
+     lists, scrollbars, date pickers) are drawn to match. */
+  color-scheme: light;
+
   /* Motion: shared by CSS and the few JS animations (page transitions). */
   --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-fast: 120ms;
@@ -44,6 +48,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.205 0.004 80);
   --foreground: oklch(0.955 0.007 95);
   --card: oklch(0.24 0.004 90);
@@ -212,5 +217,14 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Options in native selects: some browsers ignore color-scheme here. */
+@layer base {
+  option,
+  optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
   }
 }

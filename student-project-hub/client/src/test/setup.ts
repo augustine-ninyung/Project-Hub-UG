@@ -22,3 +22,8 @@ if (!window.matchMedia) {
 // Vitest 4 test files are Node's File objects. Previews don't render here anyway.
 URL.createObjectURL = () => 'blob:preview';
 URL.revokeObjectURL = () => {};
+
+// Radix Select uses pointer capture and scrolling, which jsdom doesn't have.
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.releasePointerCapture ??= () => {};
+Element.prototype.scrollIntoView ??= () => {};

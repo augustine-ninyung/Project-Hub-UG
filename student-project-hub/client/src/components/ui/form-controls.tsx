@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/utils/cn';
 
@@ -12,19 +13,22 @@ export function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
   return <textarea className={cn(fieldBase, 'min-h-24 py-2 leading-relaxed', className)} {...props} />;
 }
 
-/** Native select: accessible and mobile-friendly by default. */
+/**
+ * Native select, kept for forms: phones show their own picker, which suits
+ * them best. The colour-scheme set in index.css makes the browser draw its
+ * option list in the current theme. Filters use SelectMenu instead.
+ */
 export function Select({ className, children, ...props }: ComponentProps<'select'>) {
   return (
-    <select
-      className={cn(
-        fieldBase,
-        'h-9 appearance-none bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20fill%3D%27none%27%20stroke%3D%27%2371717a%27%20stroke-width%3D%272%27%20viewBox%3D%270%200%2024%2024%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")] bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat pr-8',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </select>
+    <div className="relative">
+      <select className={cn(fieldBase, 'peer h-9 cursor-pointer appearance-none pr-9 hover:border-ring/50', className)} {...props}>
+        {children}
+      </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground peer-disabled:opacity-50"
+        aria-hidden
+      />
+    </div>
   );
 }
 
