@@ -582,6 +582,7 @@ function LandingFooter() {
         { to: '/register', label: 'Create account' },
         { to: '/login', label: 'Sign in' },
         { to: '/forgot-password', label: 'Reset password' },
+        { to: '/privacy', label: 'Privacy' },
       ],
     },
   ];

@@ -6,6 +6,7 @@ import { slugify } from '../../utils/common-schemas.js';
 import { deleteComment } from '../engagement/engagement.service.js';
 import { notify } from '../notifications/notification.service.js';
 import { deleteProject } from '../projects/project.service.js';
+import { AWAITING_APPROVAL } from '../../services/admin-alerts.service.js';
 import { sendAccountApprovedEmail } from '../../services/email.service.js';
 import { removeImages } from '../../services/storage.service.js';
 import { FEED_TOPIC, projectTopic, queueTopic } from '../../services/realtime.service.js';
@@ -13,15 +14,6 @@ import { userSummarySelect } from '../users/user.select.js';
 import type { AdminProjectsQuery, AdminReportsQuery, AdminUsersQuery } from './admin.schemas.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Students who confirmed their email and are waiting for an admin to approve them. */
-const AWAITING_APPROVAL = {
-  role: 'STUDENT',
-  status: 'ACTIVE',
-  emailVerifiedAt: { not: null },
-  approvedAt: null,
-  deletionRequestedAt: null,
-} satisfies Prisma.UserWhereInput;
 
 export async function getStatistics() {
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);

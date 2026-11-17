@@ -21,6 +21,7 @@ const RegisterPage = lazy(() => import('@/pages/auth/register-page'));
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/forgot-password-page'));
 const ResetPasswordPage = lazy(() => import('@/pages/auth/reset-password-page'));
 const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email-page'));
+const PrivacyPage = lazy(() => import('@/pages/privacy-page'));
 const NotFoundPage = lazy(() => import('@/pages/not-found-page'));
 
 export function AppRoutes() {
@@ -42,6 +43,7 @@ export function AppRoutes() {
         />
         <Route element={<AppLayout />}>
           <Route path="explore" element={<ExplorePage />} />
+          <Route path="privacy" element={<PrivacyPage />} />
           <Route path="projects/:id" element={<ProjectDetailPage />} />
           <Route path="u/:username" element={<ProfilePage />} />
           <Route

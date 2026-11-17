@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/context/auth-context';
 import { ThemeProvider, useTheme } from '@/context/theme-context';
+import { ErrorBoundary } from '@/components/common/error-boundary';
 import { AppRoutes } from '@/routes/app-routes';
 import { getStatus } from '@/services/api';
 import './index.css';
@@ -34,7 +35,9 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
             <ThemedToaster />
           </AuthProvider>
         </BrowserRouter>

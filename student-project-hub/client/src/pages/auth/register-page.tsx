@@ -123,6 +123,13 @@ export default function RegisterPage() {
         <Button type="submit" className="w-full" loading={isSubmitting}>
           Create account
         </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          See how we handle your information in our{' '}
+          <Link to="/privacy" className="underline hover:text-foreground">
+            privacy page
+          </Link>
+          .
+        </p>
       </form>
     </div>
   );

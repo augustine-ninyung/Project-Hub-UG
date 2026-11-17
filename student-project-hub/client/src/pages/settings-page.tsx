@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { FormAlert } from '@/components/common/form-alert';
 import { PageHeader } from '@/components/common/section';
+import { Link } from 'react-router-dom';
 import { DeleteAccountCard } from '@/features/account/delete-account';
 import { TagInput } from '@/components/common/tag-input';
 import { Button } from '@/components/ui/button';
@@ -204,6 +205,12 @@ export default function SettingsPage() {
         </form>
 
         <DeleteAccountCard />
+        <p className="text-sm text-muted-foreground">
+          What we keep and who can see it:{' '}
+          <Link to="/privacy" className="text-primary hover:underline">
+            Privacy
+          </Link>
+        </p>
       </div>
     </div>
   );

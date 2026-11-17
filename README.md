@@ -154,8 +154,9 @@ student-project-hub/
 | `PORT` | | `4000` | Local HTTP port |
 | `DATABASE_URL` | ✅ | | PostgreSQL connection string. On Vercel: Supabase **transaction pooler** + `?pgbouncer=true&connection_limit=1` |
 | `DIRECT_URL` | ✅ on Vercel | | Supabase **session pooler** string. Used only to run migrations during production builds |
-| `CRON_SECRET` | ✅ in prod | 64 random hex characters | Lets Vercel Cron run the daily keep-alive and backup job (`/api/v1/cron/daily`). Without it the job is switched off |
+| `CRON_SECRET` | ✅ in prod | 64 random hex characters | Lets Vercel Cron run the daily job (keep-alive, approval reminder, backup) (`/api/v1/cron/daily`). Without it the job is switched off |
 | `BACKUP_LOCAL_DIR` | | `.backups` | Where backups go when Supabase isn't configured (development) |
+| `ALERT_EMAIL` | | | Optional extra addresses (comma-separated) for error alerts. Admins get them anyway; this address also gets alerts when the database is down |
 | `DATABASE_SCHEMA` | Previews only | `preview` | Postgres schema to use instead of `public`. Required on Vercel preview deployments, and must not be `public` |
 | `JWT_ACCESS_SECRET` | ✅ | | ≥ 32 random characters; signs access tokens and derives private live-update topics |
 | `ACCESS_TOKEN_TTL_MINUTES` | | `15` | Access-token lifetime |
@@ -219,7 +220,7 @@ npm test -w client    # component tests
 npm run typecheck     # TypeScript, both apps
 ```
 
-**Server (86 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
+**Server (94 tests).** The suite starts a throwaway embedded PostgreSQL on port 5434, applies all migrations and truncates tables between tests. Requests go through the real middleware, validation, Prisma and storage. Set `TEST_DATABASE_URL` to use an existing database instead (for example in CI).
 
 | File | Covers |
 |---|---|
@@ -227,6 +228,7 @@ npm run typecheck     # TypeScript, both apps
 | `auth.test.ts` | registration, hashing, duplicates, login by email/username, generic errors, suspended accounts, refresh-token rotation and replay, logout, CSRF, email verification, password reset |
 | `projects.test.ts` | create with images, auth and approval rules, validation, fake-image rejection, contributor invites, private-project access, owner/admin-only edit and delete, search/filter/sort/pagination, trending and featured |
 | `engagement.test.ts` | idempotent likes and counts, notifications, clearing only your own notifications, threaded comments, author-only edit, soft delete, reports |
+| `alerts.test.ts` | admins are emailed when the first student starts waiting for approval (not for every one) and reminded daily while anyone waits; error alerts for server errors with ids and query strings removed, one per kind of error an hour, an hourly cap, `ALERT_EMAIL`, no alerts for normal 4xx errors; website crash reports; every email explains why it was sent and has a text version |
 | `backup.test.ts` | the daily job runs only with the cron secret and is off without one; backups hold every table except sessions and tokens; 30-day clean-up; a full wipe-and-restore brings everything back (replies still linked, old passwords still work), including into a freshly migrated database; restore refuses a database with data |
 | `account-deletion.test.ts` | deletion requests need the password, end every session and hide the profile; sign-in reports the pending request only after a correct password and can withdraw it; admins delete for good (with projects) or keep the account; suspended accounts can be deleted without a request, active ones that didn't ask never; admin-only |
 | `admin.test.ts` | students blocked from admin endpoints, statistics, suspension revoking sessions, featuring, report resolution, categories, confirming a student's email by hand (admin-only, one-time, lets them sign in but not post until approved) |
@@ -235,7 +237,7 @@ npm run typecheck     # TypeScript, both apps
 | `realtime.test.ts` | live-update pings for likes, replies and project changes; nothing sent for failed requests; unguessable user topics; the admin topic (admins only; pinged on sign-ups, reports and admin actions) |
 | `share.test.ts` | link-preview tags for public projects, HTML escaping, private projects never described, 1200×630 preview image, fallback image |
 
-**Client (32 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, the live-update hook (subscribe, debounce, disabled when not configured), the sign-up screens (check-your-email panel, new link from sign-in, waiting-for-approval upload page), and the admin Students tab (instant approval with rollback, no approval before the email is confirmed, confirmation before granting admin, bulk approve, details panel, typing the username before permanent deletion, deleting suspended accounts), and keeping an account that is waiting to be deleted at sign-in.
+**Client (36 tests).** Login form, like button (optimistic update, rollback, anonymous redirect), comment threads, project form (validation, full submission, image checks), image compression limits, sign-out state, the live-update hook (subscribe, debounce, disabled when not configured), the sign-up screens (check-your-email panel, new link from sign-in, waiting-for-approval upload page), and the admin Students tab (instant approval with rollback, no approval before the email is confirmed, confirmation before granting admin, bulk approve, details panel, typing the username before permanent deletion, deleting suspended accounts), keeping an account that is waiting to be deleted at sign-in, the crash screen (friendly page, reported, a reload prompt after a new release) and the privacy page.
 
 ---
 
@@ -400,7 +402,10 @@ Previews still share the Supabase project with the live site: live-update pings 
 
 **Free-plan limits to know:**
 
-- **Supabase pausing is prevented** by a daily job (Vercel Cron, about 03:17 UTC) that queries the database. Free projects pause after a week without activity; if it ever happens anyway, click **Restore** in the Supabase dashboard.
+- **Supabase pausing is prevented** by a daily job (Vercel Cron, about 07:17 UTC) that queries the database. Free projects pause after a week without activity; if it ever happens anyway, click **Restore** in the Supabase dashboard.
+- **Emails to admins.** Every admin with a confirmed email gets:
+  - **Students waiting for approval:** an email when a student confirms their email and nobody else was waiting, then a daily reminder (with the daily job) while anyone is still waiting.
+  - **Error alerts:** an email when something breaks on the live site: a server error, a failed daily job, or a page crashing in someone's browser. Similar errors are grouped (at most one email per kind of error an hour, and 10 an hour in total). The email says where and what; the full details are in the Vercel function logs. Alerts never include passwords, request contents or links with tokens.
 - **Daily backups.** The same job saves `backup-YYYY-MM-DD.json.gz` to the **private** `project-hub-backups` bucket (Supabase → *Storage*) and keeps 30 days. They hold all users (with password hashes), projects, comments, likes, notifications, reports, categories and technologies, but no sessions or login tokens. Image files stay in the `project-hub` bucket and aren't copied. Backups live in the same Supabase project, so they protect against mistakes and bad deletes, not against losing the project: **download one now and then** (click the file → *Download*) and keep it somewhere private. Never put a backup in this repository; it is public.
 - **Restoring** loads a backup into an **empty** database only, so it can't overwrite live data. For a new Supabase project: point `server/.env` `DATABASE_URL` at it, run `npm run db:deploy -w server`, then `npm run db:restore -w server -- path/to/backup-YYYY-MM-DD.json.gz --yes`. To look something up instead (for example a deleted project's text), unzip the file and open the JSON. Check the job ran in Vercel → *Settings → Cron Jobs* (it can be run by hand there) or in the function logs.
 - **Vercel functions** time out after 30 seconds (`maxDuration` in `vercel.json`), and request bodies are limited to 4.5 MB.
@@ -435,7 +440,8 @@ Previews still share the Supabase project with the live site: live-update pings 
 
 ## Known limitations
 
-- **Emails can land in spam**, especially from a new Gmail account. The sign-up screen tells students to check there.
+- **Emails can land in spam**, especially from a new Gmail account. The sign-up screen tells students to check there. It improves as people open the emails and mark them "Not spam"; a custom domain with its own sender records is the long-term fix.
+- **The privacy page** (`/privacy`) describes how the site works today. Update it (and its date) if you add services, analytics or new kinds of data. It is a plain description, not legal advice.
 - **Build-log noise:** each Vercel build prints about 1,900 TypeScript errors from Vercel's function packager type-checking client files. They are harmless (deployments succeed) and don't happen in local builds; the cause on Vercel's side hasn't been identified.
 - **In-memory limits:** the general per-IP and write rate limits are per serverless instance; only the auth limits are shared through the database.
 - **Free plans:** the daily job keeps Supabase awake and takes backups, but backups sit in the same Supabase project, so download copies regularly (see *Running the live site*). Image files aren't included in backups.

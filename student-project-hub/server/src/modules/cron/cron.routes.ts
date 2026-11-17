@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { env } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
+import { reportError, sendApprovalReminder } from '../../services/admin-alerts.service.js';
 import { runDailyBackup } from '../../services/backup.service.js';
 import { ApiError } from '../../utils/api-error.js';
 import { sendSuccess } from '../../utils/response.js';
@@ -23,11 +24,20 @@ const requireCronSecret: RequestHandler = (req, _res, next) => {
 
 /**
  * Once a day: touch the database (Supabase pauses free projects after a week
- * without activity) and write the daily backup.
+ * without activity), remind admins of students waiting for approval, and
+ * write the daily backup. A failed reminder is reported but never stops the
+ * backup; a failed backup fails the job, which the error handler reports.
  */
 cronRouter.get('/daily', requireCronSecret, async (_req: Request, res: Response) => {
   await prisma.$queryRaw`SELECT 1`;
+  let waitingForApproval: number | null = null;
+  try {
+    waitingForApproval = await sendApprovalReminder();
+  } catch (err) {
+    console.error('Approval reminder failed:', err);
+    await reportError(err, 'Daily job: approval reminder');
+  }
   const backup = await runDailyBackup();
   console.log(`Daily backup ${backup.name}: ${backup.bytes} bytes, removed ${backup.removed.length} old`);
-  sendSuccess(res, { keptAlive: true, backup });
+  sendSuccess(res, { keptAlive: true, waitingForApproval, backup });
 });

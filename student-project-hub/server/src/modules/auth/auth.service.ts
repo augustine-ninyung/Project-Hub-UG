@@ -3,6 +3,7 @@ import type { AuthTokenType } from '../../generated/prisma/client.js';
 import { env } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import { signAccessToken } from '../../middleware/auth.js';
+import { notifyAdminsOfNewWaitingStudent } from '../../services/admin-alerts.service.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../../services/email.service.js';
 import { ApiError } from '../../utils/api-error.js';
 import { adminTopic, queueTopic } from '../../services/realtime.service.js';
@@ -203,6 +204,7 @@ export async function verifyEmail(token: string) {
     data: { emailVerifiedAt: new Date() },
   });
   queueTopic(adminTopic()); // now waiting for an admin's approval
+  await notifyAdminsOfNewWaitingStudent(user.id);
   return toSelfUser(user);
 }
 

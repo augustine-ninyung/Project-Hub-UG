@@ -50,6 +50,15 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   EMAIL_FROM: z.string().default('Student Project Hub <no-reply@example.com>'),
+  /**
+   * Optional extra addresses (comma-separated) for error alerts. Admins get
+   * them anyway; this one also works when the database is down.
+   */
+  ALERT_EMAIL: z
+    .string()
+    .default('')
+    .transform((v) => v.split(',').map((e) => e.trim()).filter(Boolean))
+    .pipe(z.array(z.string().email('ALERT_EMAIL must be email addresses separated by commas'))),
 
   /** Shared with Vercel Cron; scheduled jobs (keep-alive, backups) are off without it. */
   CRON_SECRET: z.preprocess(emptyToUndefined, z.string().min(16).optional()),
